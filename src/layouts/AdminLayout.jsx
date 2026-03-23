@@ -1,47 +1,39 @@
-import { Layout, Menu } from "antd";
 import { Outlet, useNavigate } from "react-router-dom";
-import { DesktopOutlined, FileOutlined } from "@ant-design/icons";
-
-const { Sider, Content } = Layout;
 
 const AdminLayout = () => {
   const navigate = useNavigate();
+
   return (
-    <Layout style={{ minHeight: "100vh" }}>
-      <Sider collapsible>
-        <div
-          style={{
-            height: 32,
-            margin: 16,
-            background: "rgba(255,255,255,0.2)",
-            color: "white",
-            textAlign: "center",
-          }}
-        >
-          ADMIN
+    <div className="flex min-h-screen">
+      {/* Sidebar */}
+      <div className="w-64 bg-gray-800 text-white p-4">
+        <div className="mb-6 text-center font-bold text-lg">ADMIN</div>
+
+        <ul className="space-y-2">
+          <li>
+            <button
+              onClick={() => navigate("/admin/movies")}
+              className="w-full text-left px-3 py-2 rounded hover:bg-gray-700"
+            >
+              Quản lý phim
+            </button>
+          </li>
+          <li>
+            <button className="w-full text-left px-3 py-2 rounded hover:bg-gray-700">
+              Quản lý lịch chiếu
+            </button>
+          </li>
+        </ul>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 p-4 bg-gray-100">
+        <div className="bg-white p-6 rounded shadow">
+          <Outlet />
         </div>
-        <Menu
-          theme="dark"
-          mode="inline"
-          items={[
-            {
-              key: "1",
-              icon: <DesktopOutlined />,
-              label: "Quản lý phim",
-              onClick: () => navigate("/admin/movies"),
-            },
-            { key: "2", icon: <FileOutlined />, label: "Quản lý lịch chiếu" },
-          ]}
-        />
-      </Sider>
-      <Layout>
-        <Content style={{ margin: "16px" }}>
-          <div style={{ padding: 24, minHeight: 360, background: "white" }}>
-            <Outlet /> {/* Nơi các trang của Bạn B hiện ra */}
-          </div>
-        </Content>
-      </Layout>
-    </Layout>
+      </div>
+    </div>
   );
 };
+
 export default AdminLayout;
