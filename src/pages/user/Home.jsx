@@ -40,7 +40,7 @@ const Home = () => {
             <img
               src={movie.image}
               alt={movie.name}
-              style={{ width: "100%", borderRadius: "4px" }}
+              style={{ width: "100%", borderRadius: "20px" }}
             />
             <h3 style={{ marginTop: "10px" }}>{movie.name}</h3>
             <p>Thời lượng: {movie.duration} phút</p>
