@@ -12,6 +12,7 @@ import SelectSeats from './pages/client/SelectSeats';
 import Checkout from './pages/client/Checkout';
 import Profile from './pages/client/Profile';
 import MyTickets from './pages/client/MyTickets';
+import About from './pages/client/About';
 
 // 3. Import Admin Pages
 import Dashboard from './pages/admin/Dashboard';
@@ -34,6 +35,7 @@ export default function App() {
           <Route path="checkout" element={<Checkout />} />
           <Route path="profile" element={<Profile />} />
           <Route path="tickets" element={<MyTickets />} />
+          <Route path="about" element={<About />} />
         </Route>
 
         {/* ================= CỤM ADMIN (Giao diện quản trị) ================= */}
