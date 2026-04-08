@@ -14,11 +14,11 @@ import Profile from './pages/client/Profile';
 import MyTickets from './pages/client/MyTickets';
 
 // 3. Import Admin Pages
-import Dashboard from './pages/admin/Dashboard';
 import Movies from './pages/admin/Movies';
-import Cinemas from './pages/admin/Cinemas';
 import Vouchers from './pages/admin/Vouchers';
 import Users from './pages/admin/Users';
+import Rooms from './pages/admin/Rooms';
+import Tickets from './pages/admin/Tickets';
 
 export default function App() {
   return (
@@ -39,14 +39,15 @@ export default function App() {
         {/* ================= CỤM ADMIN (Giao diện quản trị) ================= */}
         {/* Tất cả các route bên trong sẽ có tiền tố là /admin */}
         <Route path="/admin" element={<AdminLayout />}>
-          {/* Khi vào /admin, mặc định sẽ hiển thị trang Dashboard */}
-          <Route index element={<Dashboard />} />
+          {/* Khi vào /admin, mặc định sẽ hiển thị trang movies */}
+          <Route index element={<Movies />} />
 
           {/* Các trang con: KHÔNG viết dấu "/" ở đầu path */}
-          <Route path="movies" element={<Movies />} />   {/* Đường dẫn: /admin/movies */}
-          <Route path="cinemas" element={<Cinemas />} /> {/* Đường dẫn: /admin/cinemas */}
+          <Route path="movies" element={<Movies />} />
           <Route path="vouchers" element={<Vouchers />} /> {/* Đường dẫn: /admin/vouchers */}
           <Route path="users" element={<Users />} />     {/* Đường dẫn: /admin/users */}
+          <Route path="rooms" element={<Rooms />} />
+          <Route path="tickets" element={<Tickets/>} />
         </Route>
 
         {/* ================= XỬ LÝ LỖI 404 (Trang không tồn tại) ================= */}

@@ -34,3 +34,45 @@ export const bookings = [
   { movie: 'Desert Mirage', user: 'Maria Garcia', datetime: 'Oct 23, 2024 · 18:15', amount: '$32.00', status: 'Confirmed' },
   { movie: 'Ocean\'s Whispers', user: 'James Wilson', datetime: 'Oct 23, 2024 · 22:45', amount: '$15.50', status: 'Cancelled' },
 ];
+
+export type RoomRow = {
+  id: number;
+  name: string;
+  cinema_id: number;
+  cinema_name: string;
+};
+
+export const roomRowsSeed: RoomRow[] = [
+  { id: 1, name: 'Phòng 1', cinema_id: 1, cinema_name: 'Lumière Central' },
+  { id: 2, name: 'Phòng 2', cinema_id: 1, cinema_name: 'Lumière Central' },
+  { id: 3, name: 'Phòng VIP', cinema_id: 2, cinema_name: 'Lumière Waterfront' },
+];
+
+export const ticketRows = [
+  {
+    booking_id: 1,
+    user_id: 2,
+    user_name: 'Nguyen Van A',
+    movie_id: 1,
+    movie_title: 'Interstellar',
+    showtime_id: 1,
+    start_time: '2026-04-10 19:30:00',
+    seats: 'A5, A6',
+    total_price: 180000,
+    status: 'PAID', // PENDING | PAID | CANCELLED
+    created_at: '2026-04-05 21:30:00',
+  },
+  {
+    booking_id: 2,
+    user_id: 3,
+    user_name: 'Tran Thi B',
+    movie_id: 2,
+    movie_title: 'The Batman',
+    showtime_id: 2,
+    start_time: '2026-04-11 20:00:00',
+    seats: 'C3',
+    total_price: 90000,
+    status: 'PENDING',
+    created_at: '2026-04-05 22:10:00',
+  },
+];
