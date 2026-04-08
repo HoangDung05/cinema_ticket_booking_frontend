@@ -1,10 +1,9 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode } from 'react';
 import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom'; // Thêm Outlet
 
 export default function Layout() { // Bỏ { children }
   const location = useLocation();
   const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState('');
   // Cập nhật lại đường dẫn để có tiền tố /admin
   const navItems = [
     { name: 'Phim', path: '/admin/movies', icon: 'movie' },
@@ -83,15 +82,6 @@ export default function Layout() { // Bỏ { children }
             </h2>
           </div>
           <div className="flex items-center gap-6">
-            <div className="relative w-72 hidden lg:block">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-sm">search</span>
-              <input
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Tìm Kiếm..."
-                className="w-full bg-surface-container-low border-none rounded-lg py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-primary/20 focus:bg-white transition-all outline-none"
-              />
-            </div>
             <div className="flex items-center gap-4 text-gray-600">
               <button className="hover:text-sky-500 transition-colors relative">
                 <span className="material-symbols-outlined">notifications</span>

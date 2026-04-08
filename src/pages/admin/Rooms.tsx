@@ -3,18 +3,17 @@ import { roomRowsSeed, type RoomRow } from '../../utils/data';
 
 type RoomForm = {
   name: string;
-  cinema_id: number;
   cinema_name: string;
 };
 
 const emptyForm: RoomForm = {
   name: '',
-  cinema_id: 1,
   cinema_name: '',
 };
 
 export default function Rooms() {
   const [rows, setRows] = useState<RoomRow[]>(roomRowsSeed);
+  const [searchTerm, setSearchTerm] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<RoomForm>(emptyForm);
@@ -23,6 +22,17 @@ export default function Rooms() {
     () => (rows.length ? Math.max(...rows.map((r) => r.id)) + 1 : 1),
     [rows]
   );
+
+  const filteredRows = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter(
+      (r) =>
+        r.name.toLowerCase().includes(q) ||
+        r.cinema_name.toLowerCase().includes(q) ||
+        String(r.id).includes(q)
+    );
+  }, [rows, searchTerm]);
 
   const openCreate = () => {
     setEditingId(null);
@@ -34,7 +44,6 @@ export default function Rooms() {
     setEditingId(row.id);
     setForm({
       name: row.name,
-      cinema_id: row.cinema_id,
       cinema_name: row.cinema_name,
     });
     setIsOpen(true);
@@ -78,6 +87,15 @@ export default function Rooms() {
           Thêm phòng
         </button>
       </div>
+      <div className="relative max-w-md">
+        <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">search</span>
+        <input
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Tìm phòng theo ID, tên phòng, tên rạp"
+          className="w-full border border-gray-200 rounded-lg py-2 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-sky-200"
+        />
+      </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
@@ -86,17 +104,15 @@ export default function Rooms() {
               <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
                 <th className="p-4 font-medium">ID</th>
                 <th className="p-4 font-medium">Tên phòng</th>
-                <th className="p-4 font-medium">Cinema ID</th>
                 <th className="p-4 font-medium">Rạp</th>
                 <th className="p-4 font-medium text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="text-sm divide-y divide-gray-100">
-              {rows.map((row) => (
+              {filteredRows.map((row) => (
                 <tr key={row.id} className="hover:bg-gray-50 transition-colors">
                   <td className="p-4 font-mono text-gray-700">{row.id}</td>
                   <td className="p-4 font-semibold text-gray-900">{row.name}</td>
-                  <td className="p-4 text-gray-600">{row.cinema_id}</td>
                   <td className="p-4 text-gray-900">{row.cinema_name}</td>
                   <td className="p-4">
                     <div className="flex justify-end gap-2">
@@ -116,9 +132,9 @@ export default function Rooms() {
                   </td>
                 </tr>
               ))}
-              {!rows.length && (
+              {!filteredRows.length && (
                 <tr>
-                  <td className="p-6 text-center text-gray-500" colSpan={5}>
+                  <td className="p-6 text-center text-gray-500" colSpan={4}>
                     Chưa có dữ liệu phòng.
                   </td>
                 </tr>
@@ -139,16 +155,7 @@ export default function Rooms() {
               <input
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="Tên phòng"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-sky-200"
-              />
-              <input
-                type="number"
-                value={form.cinema_id}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, cinema_id: Number(e.target.value || 0) }))
-                }
-                placeholder="Cinema ID"
+                placeholder="Nhập tên phòng"
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-sky-200"
               />
               <input
@@ -156,7 +163,7 @@ export default function Rooms() {
                 onChange={(e) =>
                   setForm((f) => ({ ...f, cinema_name: e.target.value }))
                 }
-                placeholder="Tên rạp"
+                placeholder="Nhập tên rạp"
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-sky-200"
               />
             </div>

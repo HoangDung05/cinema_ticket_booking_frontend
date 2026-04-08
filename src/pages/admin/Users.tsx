@@ -6,7 +6,7 @@ type UserRow = {
   name: string;
   email: string;
   phone: string;
-  status: 'Standard' | 'Gold' | 'Platinum';
+  role: 'CUSTOMER' | 'ADMIN';
   joined: string;
   avatar: string;
 };
@@ -16,7 +16,7 @@ type UserForm = {
   name: string;
   email: string;
   phone: string;
-  status: 'Standard' | 'Gold' | 'Platinum';
+  role: 'CUSTOMER' | 'ADMIN';
   joined: string;
   avatar: string;
 };
@@ -26,13 +26,22 @@ const emptyForm: UserForm = {
   name: '',
   email: '',
   phone: '',
-  status: 'Standard',
+  role: 'CUSTOMER',
   joined: '',
   avatar: '',
 };
 
+function formatDateVN(value: string) {
+  if (!value) return '';
+  const normalized = value.includes('/') ? value.split('/').reverse().join('-') : value;
+  const date = new Date(`${normalized}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString('vi-VN');
+}
+
 export default function Users() {
   const [rows, setRows] = useState<UserRow[]>(users as UserRow[]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<UserForm>(emptyForm);
@@ -44,7 +53,7 @@ export default function Users() {
     setForm({
       ...emptyForm,
       id: `#LUM-${Math.floor(1000 + Math.random() * 9000)}`,
-      joined: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
+      joined: new Date().toISOString().slice(0, 10),
     });
     setIsOpen(true);
   };
@@ -77,6 +86,19 @@ export default function Users() {
     setRows((prev) => prev.filter((r) => r.id !== id));
   };
 
+  const filteredRows = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter(
+      (u) =>
+        u.name.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        u.phone.toLowerCase().includes(q) ||
+        u.id.toLowerCase().includes(q) ||
+        u.role.toLowerCase().includes(q)
+    );
+  }, [rows, searchTerm]);
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -86,6 +108,15 @@ export default function Users() {
           Thêm người dùng
         </button>
       </div>
+      <div className="relative max-w-md">
+        <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">search</span>
+        <input
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Tìm người dùng theo tên, email, SĐT, quyền"
+          className="w-full border border-gray-200 rounded-lg py-2 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-sky-200"
+        />
+      </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
@@ -94,13 +125,13 @@ export default function Users() {
               <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
                 <th className="p-4 font-medium">Người dùng</th>
                 <th className="p-4 font-medium">Liên hệ</th>
-                <th className="p-4 font-medium">Hạng</th>
+                <th className="p-4 font-medium">Phân quyền</th>
                 <th className="p-4 font-medium">Ngày tham gia</th>
                 <th className="p-4 font-medium text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="text-sm divide-y divide-gray-100">
-              {rows.map((u) => (
+              {filteredRows.map((u) => (
                 <tr key={u.id} className="hover:bg-gray-50 transition-colors">
                   <td className="p-4">
                     <p className="font-semibold text-gray-900">{u.name}</p>
@@ -110,8 +141,10 @@ export default function Users() {
                     <p className="text-gray-900">{u.email}</p>
                     <p className="text-xs text-gray-500">{u.phone}</p>
                   </td>
-                  <td className="p-4">{u.status}</td>
-                  <td className="p-4 text-gray-600">{u.joined}</td>
+                  <td className="p-4">
+                    {u.role === 'ADMIN' ? 'Quản trị viên' : 'Khách hàng'}
+                  </td>
+                  <td className="p-4 text-gray-600">{formatDateVN(u.joined)}</td>
                   <td className="p-4">
                     <div className="flex justify-end gap-2">
                       <button onClick={() => openEdit(u)} className="px-3 py-1.5 text-xs rounded-md bg-amber-50 text-amber-700 hover:bg-amber-100">
@@ -124,7 +157,7 @@ export default function Users() {
                   </td>
                 </tr>
               ))}
-              {!rows.length && (
+              {!filteredRows.length && (
                 <tr>
                   <td colSpan={5} className="p-6 text-center text-gray-500">
                     Chưa có người dùng.
@@ -141,13 +174,12 @@ export default function Users() {
           <div className="w-full max-w-md bg-white rounded-xl shadow-xl p-5 space-y-4">
             <h3 className="text-lg font-bold">{isEdit ? 'Sửa người dùng' : 'Thêm người dùng'}</h3>
             <div className="space-y-3">
-              <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Họ tên" className="w-full border rounded-lg px-3 py-2" />
-              <input value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="Email" className="w-full border rounded-lg px-3 py-2" />
-              <input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="Số điện thoại" className="w-full border rounded-lg px-3 py-2" />
-              <select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as UserForm['status'] }))} className="w-full border rounded-lg px-3 py-2">
-                <option value="Standard">Standard</option>
-                <option value="Gold">Gold</option>
-                <option value="Platinum">Platinum</option>
+              <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Nhập họ tên" className="w-full border rounded-lg px-3 py-2" />
+              <input value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="Nhập email" className="w-full border rounded-lg px-3 py-2" />
+              <input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="Nhập số điện thoại" className="w-full border rounded-lg px-3 py-2" />
+              <select value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as UserForm['role'] }))} className="w-full border rounded-lg px-3 py-2">
+                <option value="CUSTOMER">Khách hàng</option>
+                <option value="ADMIN">Quản trị viên</option>
               </select>
             </div>
             <div className="flex justify-end gap-2">
