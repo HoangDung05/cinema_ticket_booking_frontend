@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { authService } from '../../services/authService';
 
 type User = {
   fullName: string;
@@ -21,20 +22,7 @@ type RegisterForm = {
   password: string;
 };
 
-const USERS_STORAGE_KEY = 'users';
 const CURRENT_USER_STORAGE_KEY = 'currentUser';
-
-const getUsersFromStorage = (): User[] => {
-  const raw = localStorage.getItem(USERS_STORAGE_KEY);
-  if (!raw) return [];
-
-  try {
-    const parsed = JSON.parse(raw) as User[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-};
 
 const getNavClassName = ({ isActive }: { isActive: boolean }) =>
   isActive
@@ -56,6 +44,8 @@ export default function Header() {
   });
   const [loginError, setLoginError] = useState('');
   const [registerError, setRegisterError] = useState('');
+  const [isLoginLoading, setIsLoginLoading] = useState(false);
+  const [isRegisterLoading, setIsRegisterLoading] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -83,52 +73,44 @@ export default function Header() {
     };
   }, []);
 
-  const handleLoginSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleLoginSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
-    const users = getUsersFromStorage();
-    const foundUser = users.find((storedUser) => storedUser.email.toLowerCase() === loginForm.email.trim().toLowerCase());
-
-    if (!foundUser) {
-      setLoginError('Email không tồn tại');
-      return;
-    }
-
-    if (foundUser.password !== loginForm.password) {
-      setLoginError('Sai mật khẩu');
-      return;
-    }
-
-    localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(foundUser));
-    setUser(foundUser);
+    setIsLoginLoading(true);
     setLoginError('');
-    setIsLoginOpen(false);
-    setLoginForm({ email: '', password: '' });
+
+    try {
+      const response = await authService.login(loginForm);
+      localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(response));
+      setUser(response);
+      setIsLoginOpen(false);
+      setLoginForm({ email: '', password: '' });
+    } catch (error: any) {
+      setLoginError(error.response?.data || 'Đăng nhập thất bại. Vui lòng thử lại.');
+    } finally {
+      setIsLoginLoading(false);
+    }
   };
 
-  const handleRegisterSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleRegisterSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
-    const users = getUsersFromStorage();
-    const existingUser = users.find((storedUser) => storedUser.email.toLowerCase() === registerForm.email.trim().toLowerCase());
-    if (existingUser) {
-      setRegisterError('Email đã tồn tại');
-      return;
-    }
-
-    const newUser: User = {
-      fullName: registerForm.fullName.trim(),
-      email: registerForm.email.trim(),
-      phone: registerForm.phone.trim(),
-      password: registerForm.password,
-    };
-
-    const updatedUsers = [...users, newUser];
-    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(updatedUsers));
+    setIsRegisterLoading(true);
     setRegisterError('');
-    setRegisterForm({ fullName: '', email: '', phone: '', password: '' });
-    setIsRegisterOpen(false);
-    setIsLoginOpen(true);
+
+    try {
+      await authService.register({
+        fullName: registerForm.fullName.trim(),
+        email: registerForm.email.trim(),
+        phone: registerForm.phone.trim(),
+        password: registerForm.password,
+      });
+      setRegisterForm({ fullName: '', email: '', phone: '', password: '' });
+      setIsRegisterOpen(false);
+      setIsLoginOpen(true);
+    } catch (error: any) {
+      setRegisterError(error.response?.data || 'Tạo tài khoản thất bại. Email có thể đã tồn tại.');
+    } finally {
+      setIsRegisterLoading(false);
+    }
   };
 
   const handleLogout = () => {
@@ -260,8 +242,8 @@ export default function Header() {
                 className="w-full border border-outline-variant/40 rounded-lg px-3 py-2"
               />
               {loginError ? <p className="text-sm text-red-600">{loginError}</p> : null}
-              <button type="submit" className="w-full bg-primary text-white rounded-lg py-2.5 hover:opacity-90 transition-opacity">
-                Đăng nhập
+              <button type="submit" disabled={isLoginLoading} className="w-full bg-primary text-white rounded-lg py-2.5 hover:opacity-90 transition-opacity disabled:opacity-50">
+                {isLoginLoading ? 'Đang xử lý...' : 'Đăng nhập'}
               </button>
             </form>
           </div>
@@ -318,8 +300,8 @@ export default function Header() {
                 className="w-full border border-outline-variant/40 rounded-lg px-3 py-2"
               />
               {registerError ? <p className="text-sm text-red-600">{registerError}</p> : null}
-              <button type="submit" className="w-full bg-primary text-white rounded-lg py-2.5 hover:opacity-90 transition-opacity">
-                Đăng ký
+              <button type="submit" disabled={isRegisterLoading} className="w-full bg-primary text-white rounded-lg py-2.5 hover:opacity-90 transition-opacity disabled:opacity-50">
+                {isRegisterLoading ? 'Đang xử lý...' : 'Đăng ký'}
               </button>
             </form>
           </div>
