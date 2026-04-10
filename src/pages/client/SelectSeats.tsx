@@ -1,5 +1,5 @@
-import { Fragment, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Fragment, useEffect, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 
 const ROWS = ['A', 'B', 'C', 'D', 'E', 'F'] as const;
 
@@ -7,8 +7,24 @@ const ROWS = ['A', 'B', 'C', 'D', 'E', 'F'] as const;
 const SOLD_SEATS = new Set<string>(['D1', 'D2', 'D3', 'D4', 'F3', 'F4']);
 const INITIAL_SELECTED_SEATS = ['E4', 'E5'];
 
+type BookingState = {
+  movie: { id: number; title: string; posterUrl?: string; duration?: number };
+  dateDisplay: string;
+  timeLabel: string;
+  showtimeId: number;
+  cinemaName: string;
+  startTime?: string;
+};
+
 export default function SelectSeats() {
+  const location = useLocation();
+  const booking = (location.state as { booking?: BookingState } | null)?.booking;
+
   const [selectedSeats, setSelectedSeats] = useState<string[]>(INITIAL_SELECTED_SEATS);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, []);
 
   const sortSeatIds = (ids: string[]) =>
     [...ids].sort((a, b) => {
@@ -85,19 +101,19 @@ export default function SelectSeats() {
             <div className="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center font-headline font-bold shadow-md">
               <span className="material-symbols-outlined text-xl">check</span>
             </div>
-            <span className="text-sm font-headline font-bold text-primary">Schedule</span>
+            <span className="text-sm font-headline font-bold text-primary">Lịch chiếu</span>
           </div>
           <div className="w-16 h-1 bg-primary rounded-full"></div>
           <div className="flex flex-col items-center gap-2">
             <div className="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center font-headline font-bold shadow-md">2</div>
-            <span className="text-sm font-headline font-bold text-primary">Seats</span>
+            <span className="text-sm font-headline font-bold text-primary">Chọn ghế</span>
           </div>
           <div className="w-16 h-1 bg-surface-container-high rounded-full overflow-hidden">
             <div className="w-1/2 h-full bg-primary"></div>
           </div>
           <div className="flex flex-col items-center gap-2">
             <div className="w-10 h-10 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center font-headline font-bold">3</div>
-            <span className="text-sm font-headline font-semibold text-on-surface-variant">Payment</span>
+            <span className="text-sm font-headline font-semibold text-on-surface-variant">Thanh toán</span>
           </div>
         </div>
       </div>
@@ -165,16 +181,27 @@ export default function SelectSeats() {
         {/* Sidebar Summary */}
         <div className="lg:col-span-4">
           <div className="bg-surface-container-lowest rounded-3xl p-6 border border-outline-variant/20 shadow-lg sticky top-24">
-            <h2 className="text-2xl font-headline font-bold text-on-surface mb-6">Booking Summary</h2>
+            <h2 className="text-2xl font-headline font-bold text-on-surface mb-6">Tóm tắt đặt vé</h2>
             
             <div className="flex gap-4 mb-6 pb-6 border-b border-outline-variant/20">
-              <div className="w-16 rounded-lg overflow-hidden shrink-0">
-                <img src="https://images.unsplash.com/photo-1626814026160-2237a95fc5a0?auto=format&fit=crop&q=80&w=200" alt="Poster" className="w-full h-auto object-cover" />
+              <div className="w-16 rounded-lg overflow-hidden shrink-0 aspect-[2/3] bg-surface-container-high">
+                <img
+                  src={
+                    booking?.movie?.posterUrl ||
+                    'https://images.unsplash.com/photo-1626814026160-2237a95fc5a0?auto=format&fit=crop&q=80&w=200'
+                  }
+                  alt={booking?.movie?.title ? `Áp phích ${booking.movie.title}` : 'Poster'}
+                  className="w-full h-full object-cover"
+                />
               </div>
-              <div>
-                <h3 className="font-headline font-bold text-on-surface mb-1">The Midnight Protocol</h3>
-                <p className="text-sm text-on-surface-variant">Grand Lumière • IMAX 3D</p>
-                <p className="text-sm font-medium text-on-surface mt-1">Thu, Oct 24 • 05:00 PM</p>
+              <div className="min-w-0">
+                <h3 className="font-headline font-bold text-on-surface mb-1 line-clamp-2">
+                  {booking?.movie.title ?? '—'}
+                </h3>
+                <p className="text-sm text-on-surface-variant">{booking?.cinemaName ?? '—'}</p>
+                <p className="text-sm font-medium text-on-surface mt-1">
+                  {booking ? `${booking.dateDisplay} • ${booking.timeLabel}` : '—'}
+                </p>
               </div>
             </div>
             

@@ -29,7 +29,7 @@ export default function App() {
         {/* Tất cả các route bên trong sẽ dùng chung ClientLayout */}
         <Route path="/" element={<ClientLayout />}>
           <Route index element={<Home />} /> {/* Khớp với đường dẫn "/" */}
-          <Route path="movie" element={<MovieDetails />} />
+          <Route path="movie/:id" element={<MovieDetails />} />
           <Route path="book/showtime" element={<SelectShowtime />} />
           <Route path="book/seats" element={<SelectSeats />} />
           <Route path="checkout" element={<Checkout />} />
