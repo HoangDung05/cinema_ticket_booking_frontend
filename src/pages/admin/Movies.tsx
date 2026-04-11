@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { movies as movieSeed } from '../../utils/data';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { movieService, type MovieDto } from '../../services/movieService';
 
 type MovieStatus = 'Showing' | 'Upcoming' | 'Archived';
 type FilterStatus = 'ALL' | 'SHOWING' | 'UPCOMING';
@@ -10,7 +10,7 @@ type MovieRow = {
   release: string;
   status: MovieStatus;
   image: string;
-  duration: number; // thời lượng (phút)
+  duration: number;
   trailerUrl: string;
   description: string;
 };
@@ -27,6 +27,18 @@ const emptyForm: MovieForm = {
   description: '',
 };
 
+const apiStatus: Record<MovieStatus, MovieDto['status']> = {
+  Showing: 'NOW_SHOWING',
+  Upcoming: 'COMING_SOON',
+  Archived: 'ENDED',
+};
+
+const uiStatus = (s: string): MovieStatus => {
+  if (s === 'NOW_SHOWING') return 'Showing';
+  if (s === 'ENDED') return 'Archived';
+  return 'Upcoming';
+};
+
 function formatDateVN(value: string) {
   if (!value) return '';
   const normalized = value.includes('/') ? value.split('/').reverse().join('-') : value;
@@ -35,18 +47,60 @@ function formatDateVN(value: string) {
   return date.toLocaleDateString('vi-VN');
 }
 
+function fromApi(m: MovieDto): MovieRow {
+  const rd = m.releaseDate ? String(m.releaseDate).split('T')[0] : '';
+  return {
+    id: m.id ?? 0,
+    title: m.title,
+    release: rd,
+    status: uiStatus(m.status),
+    image: m.posterUrl || '',
+    duration: m.duration ?? 0,
+    trailerUrl: m.trailerUrl || '',
+    description: m.description || '',
+  };
+}
+
+function toPayload(form: MovieForm): Omit<MovieDto, 'id'> {
+  return {
+    title: form.title.trim(),
+    description: form.description || undefined,
+    duration: form.duration,
+    releaseDate: form.release || undefined,
+    posterUrl: form.image || undefined,
+    trailerUrl: form.trailerUrl || undefined,
+    status: apiStatus[form.status],
+  };
+}
+
 export default function Movies() {
-  const [rows, setRows] = useState<MovieRow[]>(movieSeed as MovieRow[]);
+  const [rows, setRows] = useState<MovieRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [filter, setFilter] = useState<FilterStatus>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<MovieForm>(emptyForm);
+  const [saving, setSaving] = useState(false);
 
-  const nextId = useMemo(
-    () => (rows.length ? Math.max(...rows.map((r) => r.id)) + 1 : 1),
-    [rows]
-  );
+  const loadMovies = useCallback(async () => {
+    setLoadError('');
+    setLoading(true);
+    try {
+      const list = await movieService.getAllMovies();
+      setRows(list.map(fromApi));
+    } catch (e) {
+      console.error(e);
+      setLoadError('Không tải được danh sách phim. Kiểm tra backend và đăng nhập admin.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadMovies();
+  }, [loadMovies]);
 
   const filteredMovies = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
@@ -54,8 +108,8 @@ export default function Movies() {
       filter === 'ALL'
         ? rows
         : filter === 'SHOWING'
-        ? rows.filter((m) => m.status === 'Showing')
-        : rows.filter((m) => m.status === 'Upcoming');
+          ? rows.filter((m) => m.status === 'Showing')
+          : rows.filter((m) => m.status === 'Upcoming');
 
     if (!q) return byFilter;
     return byFilter.filter(
@@ -92,17 +146,35 @@ export default function Movies() {
     setForm(emptyForm);
   };
 
-  const saveMovie = () => {
+  const saveMovie = async () => {
     if (!form.title.trim()) return;
-
-    if (editingId === null) {
-      setRows((prev) => [{ id: nextId, ...form }, ...prev]);
-    } else {
-      setRows((prev) =>
-        prev.map((m) => (m.id === editingId ? { ...m, ...form } : m))
-      );
+    setSaving(true);
+    try {
+      const payload = toPayload(form);
+      if (editingId === null) {
+        await movieService.createMovie(payload);
+      } else {
+        await movieService.updateMovie(editingId, payload);
+      }
+      await loadMovies();
+      closeModal();
+    } catch (e) {
+      console.error(e);
+      window.alert('Lưu phim thất bại. Kiểm tra dữ liệu và quyền đăng nhập.');
+    } finally {
+      setSaving(false);
     }
-    closeModal();
+  };
+
+  const deleteMovie = async (id: number) => {
+    if (!window.confirm('Xóa phim này khỏi hệ thống?')) return;
+    try {
+      await movieService.deleteMovie(id);
+      await loadMovies();
+    } catch (e) {
+      console.error(e);
+      window.alert('Xóa phim thất bại.');
+    }
   };
 
   return (
@@ -159,80 +231,90 @@ export default function Movies() {
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        {filteredMovies.map((movie) => (
-          <div
-            key={movie.id}
-            className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 group"
-          >
-            <div className="relative h-64 overflow-hidden">
-              <img
-                src={movie.image}
-                alt={movie.title}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              />
-              <div className="absolute top-3 right-3">
-                <span
-                  className={`px-2.5 py-1 rounded-full text-xs font-bold backdrop-blur-md ${
-                    movie.status === 'Showing'
-                      ? 'bg-emerald-500/90 text-white'
+      {loadError ? <p className="text-sm text-red-600">{loadError}</p> : null}
+      {loading ? (
+        <div className="flex justify-center py-16 text-gray-500">Đang tải phim...</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+          {filteredMovies.map((movie) => (
+            <div
+              key={movie.id}
+              className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 group"
+            >
+              <div className="relative h-64 overflow-hidden">
+                <img
+                  src={
+                    movie.image ||
+                    'https://images.unsplash.com/photo-1626814026160-2237a95fc5a0?auto=format&fit=crop&q=80&w=600'
+                  }
+                  alt={movie.title}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+                <div className="absolute top-3 right-3">
+                  <span
+                    className={`px-2.5 py-1 rounded-full text-xs font-bold backdrop-blur-md ${
+                      movie.status === 'Showing'
+                        ? 'bg-emerald-500/90 text-white'
+                        : movie.status === 'Upcoming'
+                          ? 'bg-sky-500/90 text-white'
+                          : 'bg-gray-900/80 text-white'
+                    }`}
+                  >
+                    {movie.status === 'Showing'
+                      ? 'Đang chiếu'
                       : movie.status === 'Upcoming'
-                      ? 'bg-sky-500/90 text-white'
-                      : 'bg-gray-900/80 text-white'
-                  }`}
-                >
-                 {movie.status === 'Showing'
-                    ? 'Đang chiếu'
-                    : movie.status === 'Upcoming'
-                    ? 'Sắp chiếu'
-                    : 'Lưu trữ'}
-                </span>
-              </div>
-            </div>
-
-            <div className="p-5">
-              <h3 className="font-bold text-lg text-gray-900 line-clamp-1">
-                {movie.title}
-              </h3>
-
-              <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-                {movie.description}
-              </p>
-
-              <div className="flex items-center justify-between text-xs text-gray-500 pt-3 border-t border-gray-100">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[14px]">schedule</span>
-                  {movie.duration} phút
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[14px]">calendar_today</span>
-                  {formatDateVN(movie.release)}
+                        ? 'Sắp chiếu'
+                        : 'Lưu trữ'}
+                  </span>
                 </div>
               </div>
 
-              <div className="flex justify-end mt-3">
-                <button
-                  onClick={() => openEdit(movie)}
-                  className="text-sky-600 hover:text-sky-700 font-medium"
-                >
-                  Sửa
-                </button>
+              <div className="p-5">
+                <h3 className="font-bold text-lg text-gray-900 line-clamp-1">{movie.title}</h3>
+
+                <p className="text-sm text-gray-600 mb-3 line-clamp-2">{movie.description}</p>
+
+                <div className="flex items-center justify-between text-xs text-gray-500 pt-3 border-t border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[14px]">schedule</span>
+                    {movie.duration} phút
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px]">calendar_today</span>
+                    {formatDateVN(movie.release)}
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 mt-3">
+                  <button
+                    type="button"
+                    onClick={() => openEdit(movie)}
+                    className="text-sky-600 hover:text-sky-700 font-medium text-sm"
+                  >
+                    Sửa
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteMovie(movie.id)}
+                    className="text-red-600 hover:text-red-700 font-medium text-sm"
+                  >
+                    Xóa
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
-      {filteredMovies.length === 0 && (
+      {!loading && filteredMovies.length === 0 && (
         <div className="text-center py-10 text-gray-500">Không có phim phù hợp bộ lọc.</div>
       )}
 
       {isOpen && (
         <div className="fixed inset-0 z-[100] bg-black/30 flex items-center justify-center px-4">
           <div className="w-full max-w-lg bg-white rounded-xl shadow-xl p-5 space-y-4">
-            <h3 className="text-lg font-bold">
-              {editingId === null ? 'Thêm phim' : 'Sửa phim'}
-            </h3>
+            <h3 className="text-lg font-bold">{editingId === null ? 'Thêm phim' : 'Sửa phim'}</h3>
 
             <div className="grid grid-cols-2 gap-3">
               <input
@@ -243,8 +325,8 @@ export default function Movies() {
               />
               <input
                 type="number"
-                min="0"
-                step="1"
+                min={0}
+                step={1}
                 value={form.duration === 0 ? '' : form.duration}
                 onChange={(e) =>
                   setForm((f) => ({
@@ -287,20 +369,23 @@ export default function Movies() {
               />
               <textarea
                 value={form.description}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, description: e.target.value }))
-                }
+                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                 placeholder="Nhập mô tả phim"
                 className="col-span-2 border rounded-lg px-3 py-2 min-h-[90px]"
               />
             </div>
 
             <div className="flex justify-end gap-2">
-              <button onClick={closeModal} className="px-4 py-2 rounded-lg border">
+              <button type="button" onClick={closeModal} className="px-4 py-2 rounded-lg border" disabled={saving}>
                 Hủy
               </button>
-              <button onClick={saveMovie} className="px-4 py-2 rounded-lg bg-sky-600 text-white">
-                Lưu
+              <button
+                type="button"
+                onClick={() => void saveMovie()}
+                disabled={saving}
+                className="px-4 py-2 rounded-lg bg-sky-600 text-white disabled:opacity-50"
+              >
+                {saving ? 'Đang lưu...' : 'Lưu'}
               </button>
             </div>
           </div>

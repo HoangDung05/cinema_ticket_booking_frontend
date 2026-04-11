@@ -1,9 +1,22 @@
-import { ReactNode } from 'react';
-import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom'; // Thêm Outlet
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
+import { CURRENT_USER_STORAGE_KEY, readAuthSession } from '../utils/authSession';
 
 export default function Layout() { // Bỏ { children }
   const location = useLocation();
   const navigate = useNavigate();
+  const [displayName, setDisplayName] = useState('Admin');
+
+  useEffect(() => {
+    const session = readAuthSession();
+    const name = session?.fullName?.trim() || session?.email?.trim() || 'Admin';
+    setDisplayName(name);
+  }, []);
+
+  const avatarUrl = useMemo(() => {
+    const enc = encodeURIComponent(displayName);
+    return `https://ui-avatars.com/api/?name=${enc}&background=0ea5e9&color=fff`;
+  }, [displayName]);
   // Cập nhật lại đường dẫn để có tiền tố /admin
   const navItems = [
     { name: 'Phim', path: '/admin/movies', icon: 'movie' },
@@ -14,9 +27,8 @@ export default function Layout() { // Bỏ { children }
   ];
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    navigate('/');
+    localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
+    navigate('/', { replace: true });
   };
   return (
     <div className="bg-surface text-on-surface min-h-screen flex font-body">
@@ -50,14 +62,14 @@ export default function Layout() { // Bỏ { children }
           <div className="flex items-center gap-3 bg-surface-container-low p-3 rounded-xl">
             <div className="w-10 h-10 rounded-full bg-surface-container-high overflow-hidden border-2 border-white">
               <img
-                src="https://ui-avatars.com/api/?name=Alex+Sterling" // Đổi link ảnh để demo
-                alt="Admin User Profile"
+                src={avatarUrl}
+                alt=""
                 className="w-full h-full object-cover"
               />
             </div>
             <div className="flex-1 overflow-hidden">
-              <p className="text-sm font-bold truncate text-on-surface">Alex Sterling</p>
-              <p className="text-[10px] text-on-surface-variant">System Admin</p>
+              <p className="text-sm font-bold truncate text-on-surface">{displayName}</p>
+              <p className="text-[10px] text-on-surface-variant">Quản trị viên</p>
             </div>
           </div>
           {/* Nút logout */}

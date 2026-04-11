@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { CURRENT_USER_STORAGE_KEY } from '../utils/authSession';
 
 const apiClient = axios.create({
   baseURL: 'http://localhost:8080/api', // Đường dẫn tới Backend Spring Boot
@@ -11,7 +12,7 @@ const apiClient = axios.create({
 // Interceptor cho Request (ví dụ muốn đính kèm JWT Token)
 apiClient.interceptors.request.use(
   (config) => {
-    const rawCurrentUser = localStorage.getItem('currentUser');
+    const rawCurrentUser = localStorage.getItem(CURRENT_USER_STORAGE_KEY);
     if (rawCurrentUser) {
       try {
         const parsed = JSON.parse(rawCurrentUser);

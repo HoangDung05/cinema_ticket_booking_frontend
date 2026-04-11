@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { userService } from '../../services/userService';
+import { CURRENT_USER_STORAGE_KEY } from '../../utils/authSession';
 
 type User = {
   fullName: string;
@@ -8,8 +9,6 @@ type User = {
   phone: string;
   avatarUrl?: string;
 };
-
-const CURRENT_USER_STORAGE_KEY = 'currentUser';
 
 export default function Profile() {
   const [isLoading, setIsLoading] = useState(true);

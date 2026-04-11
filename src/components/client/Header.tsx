@@ -1,14 +1,7 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
-
-type User = {
-  fullName: string;
-  email: string;
-  phone: string;
-  password: string;
-  avatarUrl?: string;
-};
+import { AuthSession, CURRENT_USER_STORAGE_KEY } from '../../utils/authSession';
 
 type LoginForm = {
   email: string;
@@ -22,8 +15,6 @@ type RegisterForm = {
   password: string;
 };
 
-const CURRENT_USER_STORAGE_KEY = 'currentUser';
-
 const getNavClassName = ({ isActive }: { isActive: boolean }) =>
   isActive
     ? 'text-primary font-headline font-semibold'
@@ -31,7 +22,7 @@ const getNavClassName = ({ isActive }: { isActive: boolean }) =>
 
 export default function Header() {
   const navigate = useNavigate();
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthSession | null>(null);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -52,8 +43,12 @@ export default function Header() {
     const rawCurrentUser = localStorage.getItem(CURRENT_USER_STORAGE_KEY);
     if (rawCurrentUser) {
       try {
-        const parsedUser = JSON.parse(rawCurrentUser) as User;
-        setUser(parsedUser);
+        const parsedUser = JSON.parse(rawCurrentUser) as AuthSession;
+        if (parsedUser?.token && parsedUser?.email) {
+          setUser(parsedUser);
+        } else {
+          localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
+        }
       } catch {
         localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
       }
@@ -79,11 +74,20 @@ export default function Header() {
     setLoginError('');
 
     try {
-      const response = await authService.login(loginForm);
-      localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(response));
-      setUser(response);
+      const data = (await authService.login(loginForm)) as AuthSession & { role_id?: string | number };
+      localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(data));
+      setUser(data);
       setIsLoginOpen(false);
       setLoginForm({ email: '', password: '' });
+
+      const raw = data.roleId ?? data.role_id;
+      const roleId = Number(raw);
+
+      if (roleId === 2) {
+        navigate('/admin', { replace: true });
+      } else {
+        navigate('/', { replace: true });
+      }
     } catch (error: any) {
       setLoginError(error.response?.data || 'Đăng nhập thất bại. Vui lòng thử lại.');
     } finally {

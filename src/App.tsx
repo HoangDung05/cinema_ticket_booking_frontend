@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 
 // 1. Import Layouts
 import ClientLayout from './layouts/ClientLayout';
-import AdminLayout from './layouts/AdminLayout';
+import AdminRoute from './components/AdminRoute';
 
 // 2. Import Client Pages (Đảm bảo đường dẫn này đúng với thư mục của bạn)
 import Home from './pages/client/Home';
@@ -40,7 +40,7 @@ export default function App() {
 
         {/* ================= CỤM ADMIN (Giao diện quản trị) ================= */}
         {/* Tất cả các route bên trong sẽ có tiền tố là /admin */}
-        <Route path="/admin" element={<AdminLayout />}>
+        <Route path="/admin" element={<AdminRoute />}>
           {/* Khi vào /admin, mặc định sẽ hiển thị trang movies */}
           <Route index element={<Movies />} />
 
