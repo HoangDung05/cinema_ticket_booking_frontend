@@ -1,26 +1,20 @@
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { BookingFlowState, TICKET_PRICE_VND, formatVnd } from '../../utils/bookingFlow';
 
 const ROWS = ['A', 'B', 'C', 'D', 'E', 'F'] as const;
 
 // Quy ước seatId: RowLetter + number (vd: E4)
 const SOLD_SEATS = new Set<string>(['D1', 'D2', 'D3', 'D4', 'F3', 'F4']);
-const INITIAL_SELECTED_SEATS = ['E4', 'E5'];
 
-type BookingState = {
-  movie: { id: number; title: string; posterUrl?: string; duration?: number };
-  dateDisplay: string;
-  timeLabel: string;
-  showtimeId: number;
-  cinemaName: string;
-  startTime?: string;
-};
+const POSTER_FALLBACK =
+  'https://images.unsplash.com/photo-1626814026160-2237a95fc5a0?auto=format&fit=crop&q=80&w=200';
 
 export default function SelectSeats() {
   const location = useLocation();
-  const booking = (location.state as { booking?: BookingState } | null)?.booking;
+  const booking = (location.state as { booking?: BookingFlowState } | null)?.booking;
 
-  const [selectedSeats, setSelectedSeats] = useState<string[]>(INITIAL_SELECTED_SEATS);
+  const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' });
@@ -38,6 +32,11 @@ export default function SelectSeats() {
     });
 
   const selectedSeatsSorted = sortSeatIds(selectedSeats);
+
+  const subtotalVnd = useMemo(
+    () => selectedSeatsSorted.length * TICKET_PRICE_VND,
+    [selectedSeatsSorted.length]
+  );
 
   const toggleSeat = (seatId: string) => {
     if (SOLD_SEATS.has(seatId)) return; // Ghế đã bán không thể click
@@ -91,6 +90,20 @@ export default function SelectSeats() {
       </button>
     );
   };
+
+  if (!booking?.movie) {
+    return (
+      <div className="max-w-7xl mx-auto px-6 py-24 text-center">
+        <h1 className="text-2xl font-headline font-bold text-on-surface mb-3">Chưa có thông tin suất chiếu</h1>
+        <p className="text-on-surface-variant mb-6">Vui lòng chọn lịch chiếu trước khi chọn ghế.</p>
+        <Link to="/" className="text-primary font-headline font-bold hover:underline">
+          Về trang chủ
+        </Link>
+      </div>
+    );
+  }
+
+  const m = booking.movie;
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-12">
@@ -178,57 +191,92 @@ export default function SelectSeats() {
           </div>
         </div>
 
-        {/* Sidebar Summary */}
+        {/* Sidebar — cùng cấu trúc với trang chọn suất */}
         <div className="lg:col-span-4">
-          <div className="bg-surface-container-lowest rounded-3xl p-6 border border-outline-variant/20 shadow-lg sticky top-24">
-            <h2 className="text-2xl font-headline font-bold text-on-surface mb-6">Tóm tắt đặt vé</h2>
-            
+          <div className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/20 shadow-lg sticky top-24">
             <div className="flex gap-4 mb-6 pb-6 border-b border-outline-variant/20">
-              <div className="w-16 rounded-lg overflow-hidden shrink-0 aspect-[2/3] bg-surface-container-high">
+              <div className="w-20 rounded-lg overflow-hidden shrink-0 aspect-[2/3] bg-surface-container-high">
                 <img
-                  src={
-                    booking?.movie?.posterUrl ||
-                    'https://images.unsplash.com/photo-1626814026160-2237a95fc5a0?auto=format&fit=crop&q=80&w=200'
-                  }
-                  alt={booking?.movie?.title ? `Áp phích ${booking.movie.title}` : 'Poster'}
+                  src={m.posterUrl || POSTER_FALLBACK}
+                  alt={`Áp phích ${m.title}`}
                   className="w-full h-full object-cover"
                 />
               </div>
               <div className="min-w-0">
-                <h3 className="font-headline font-bold text-on-surface mb-1 line-clamp-2">
-                  {booking?.movie.title ?? '—'}
-                </h3>
-                <p className="text-sm text-on-surface-variant">{booking?.cinemaName ?? '—'}</p>
-                <p className="text-sm font-medium text-on-surface mt-1">
-                  {booking ? `${booking.dateDisplay} • ${booking.timeLabel}` : '—'}
-                </p>
+                <h3 className="font-headline font-bold text-on-surface mb-1 line-clamp-2">{m.title}</h3>
+                {m.duration != null ? (
+                  <p className="text-sm text-on-surface-variant">{m.duration} phút</p>
+                ) : null}
               </div>
             </div>
-            
-            <div className="mb-6 pb-6 border-b border-outline-variant/20">
-              <div className="flex justify-between items-center mb-4">
-                <span className="text-on-surface-variant">Selected Seats</span>
-                <span className="font-headline font-bold text-on-surface">
-                  {selectedSeatsSorted.length ? selectedSeatsSorted.join(', ') : '—'}
-                </span>
+
+            <div className="flex flex-col gap-4 mb-6">
+              <div className="flex items-start gap-3">
+                <span className="material-symbols-outlined text-primary mt-0.5">calendar_today</span>
+                <div>
+                  <p className="text-sm text-on-surface-variant">Ngày</p>
+                  <p className="font-headline font-bold text-on-surface">{booking.dateDisplay}</p>
+                </div>
               </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-on-surface-variant">2 × Adult (IMAX)</span>
-                <span className="font-medium text-on-surface">$44.00</span>
+              <div className="flex items-start gap-3">
+                <span className="material-symbols-outlined text-primary mt-0.5">schedule</span>
+                <div>
+                  <p className="text-sm text-on-surface-variant">Giờ chiếu</p>
+                  <p className="font-headline font-bold text-on-surface">{booking.timeLabel}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="material-symbols-outlined text-primary mt-0.5">location_on</span>
+                <div>
+                  <p className="text-sm text-on-surface-variant">Rạp</p>
+                  <p className="font-headline font-bold text-on-surface">{booking.cinemaName}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="material-symbols-outlined text-primary mt-0.5">event_seat</span>
+                <div>
+                  <p className="text-sm text-on-surface-variant">Ghế đã chọn</p>
+                  <p className="font-headline font-bold text-on-surface">
+                    {selectedSeatsSorted.length ? selectedSeatsSorted.join(', ') : '—'}
+                  </p>
+                </div>
               </div>
             </div>
-            
-            <div className="flex justify-between items-end mb-8">
-              <div>
-                <span className="text-sm text-on-surface-variant block mb-1">Total Amount</span>
-                <span className="text-3xl font-headline font-extrabold text-primary">$44.00</span>
+
+            <div className="space-y-3 mb-6 pb-6 border-b border-outline-variant/20 text-sm">
+              <div className="flex justify-between items-center">
+                <span className="text-on-surface-variant">Đơn giá</span>
+                <span className="font-medium text-on-surface">{formatVnd(TICKET_PRICE_VND)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-on-surface-variant">Số vé</span>
+                <span className="font-medium text-on-surface">{selectedSeatsSorted.length}</span>
+              </div>
+              <div className="flex justify-between items-center pt-1">
+                <span className="text-on-surface-variant font-headline font-semibold">Tạm tính</span>
+                <span className="font-headline font-bold text-primary text-lg">{formatVnd(subtotalVnd)}</span>
               </div>
             </div>
-            
-            <Link to="/checkout" className="w-full py-4 bg-primary text-on-primary rounded-xl font-headline font-bold hover:bg-primary/90 transition-all shadow-md flex items-center justify-center gap-2">
-              Proceed to Payment
-              <span className="material-symbols-outlined">payment</span>
-            </Link>
+
+            {selectedSeatsSorted.length === 0 ? (
+              <span className="w-full py-4 rounded-xl font-headline font-bold bg-surface-container-high text-on-surface-variant text-center block opacity-80">
+                Chọn ít nhất một ghế để tiếp tục
+              </span>
+            ) : (
+              <Link
+                to="/checkout"
+                state={{
+                  booking: {
+                    ...booking,
+                    selectedSeats: selectedSeatsSorted,
+                  },
+                }}
+                className="w-full py-4 bg-primary text-on-primary rounded-xl font-headline font-bold hover:bg-primary/90 transition-all shadow-md flex items-center justify-center gap-2"
+              >
+                Tiếp tục thanh toán
+                <span className="material-symbols-outlined">arrow_forward</span>
+              </Link>
+            )}
           </div>
         </div>
       </div>
