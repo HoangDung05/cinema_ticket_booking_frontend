@@ -10,6 +10,7 @@ import MovieDetails from './pages/client/MovieDetails';
 import SelectShowtime from './pages/client/SelectShowtime';
 import SelectSeats from './pages/client/SelectSeats';
 import Checkout from './pages/client/Checkout';
+import BookingSuccess from './pages/client/BookingSuccess';
 import Profile from './pages/client/Profile';
 import MyTickets from './pages/client/MyTickets';
 import About from './pages/client/About';
@@ -33,6 +34,7 @@ export default function App() {
           <Route path="book/showtime" element={<SelectShowtime />} />
           <Route path="book/seats" element={<SelectSeats />} />
           <Route path="checkout" element={<Checkout />} />
+          <Route path="booking-success" element={<BookingSuccess />} />
           <Route path="profile" element={<Profile />} />
           <Route path="tickets" element={<MyTickets />} />
           <Route path="about" element={<About />} />

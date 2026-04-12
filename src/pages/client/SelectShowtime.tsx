@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { movieService } from '../../services/movieService';
+import { parseLocalDateTimeLoose } from '../../utils/localDateTime';
+import { formatShowtimeWindowFromIso } from '../../utils/showtimeRange';
 
 const FIXED_CINEMA_NAME = 'Group3 Cinema – Chi nhánh trung tâm';
 
@@ -14,7 +16,7 @@ type MovieBrief = {
 type ShowtimeApi = {
   id: number;
   startTime: string;
-  room?: { name?: string; cinema?: { name?: string } };
+  price: number;
 };
 
 function startOfDay(d: Date): Date {
@@ -41,10 +43,6 @@ function formatDayMonth(d: Date): string {
   const dd = String(d.getDate()).padStart(2, '0');
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   return `${dd}/${mm}`;
-}
-
-function formatTimeHHmm(d: Date): string {
-  return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 function formatDateLongVi(d: Date): string {
@@ -124,8 +122,11 @@ export default function SelectShowtime() {
 
   const showtimesForDay = useMemo(() => {
     return showtimes
-      .filter((st) => isSameDay(new Date(st.startTime), selectedDate))
-      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+      .filter((st) => isSameDay(parseLocalDateTimeLoose(st.startTime), selectedDate))
+      .sort(
+        (a, b) =>
+          parseLocalDateTimeLoose(a.startTime).getTime() - parseLocalDateTimeLoose(b.startTime).getTime()
+      );
   }, [showtimes, selectedDate]);
 
   const selectedShowtime = useMemo(
@@ -134,7 +135,9 @@ export default function SelectShowtime() {
   );
 
   const selectedTimeLabel =
-    selectedShowtime != null ? formatTimeHHmm(new Date(selectedShowtime.startTime)) : null;
+    selectedShowtime != null
+      ? formatShowtimeWindowFromIso(selectedShowtime.startTime, movie?.duration)
+      : null;
 
   const handleContinue = () => {
     if (!movie || selectedShowtimeId == null || selectedShowtime == null) return;
@@ -143,10 +146,13 @@ export default function SelectShowtime() {
         booking: {
           movie,
           dateDisplay: formatDateLongVi(selectedDate),
-          timeLabel: selectedTimeLabel ?? formatTimeHHmm(new Date(selectedShowtime.startTime)),
+          timeLabel:
+            selectedTimeLabel ??
+            formatShowtimeWindowFromIso(selectedShowtime.startTime, movie?.duration),
           showtimeId: selectedShowtime.id,
           cinemaName: FIXED_CINEMA_NAME,
           startTime: selectedShowtime.startTime,
+          price: selectedShowtime.price,
         },
       },
     });
@@ -247,27 +253,20 @@ export default function SelectShowtime() {
             ) : (
               <div className="flex flex-wrap gap-3">
                 {showtimesForDay.map((st) => {
-                  const t = new Date(st.startTime);
-                  const label = formatTimeHHmm(t);
+                  const label = formatShowtimeWindowFromIso(st.startTime, movie?.duration);
                   const isPicked = selectedShowtimeId === st.id;
-                  const roomName = st.room?.name;
                   return (
                     <button
                       key={st.id}
                       type="button"
                       onClick={() => setSelectedShowtimeId(st.id)}
-                      className={`px-6 py-3 rounded-xl font-headline font-bold transition-colors border border-outline-variant/10 min-w-[5.5rem] ${
+                      className={`px-4 py-3 rounded-xl font-headline font-bold transition-colors border border-outline-variant/10 min-w-[9.5rem] text-center text-sm sm:text-base ${
                         isPicked
                           ? 'bg-primary text-on-primary shadow-md'
                           : 'bg-surface-container-low text-on-surface hover:bg-primary/15'
                       }`}
                     >
-                      <span>{label}</span>
-                      {roomName ? (
-                        <span className={`block text-xs font-semibold mt-0.5 ${isPicked ? 'text-on-primary/85' : 'text-on-surface-variant'}`}>
-                          {roomName}
-                        </span>
-                      ) : null}
+                      <span className="leading-snug whitespace-normal">{label}</span>
                     </button>
                   );
                 })}

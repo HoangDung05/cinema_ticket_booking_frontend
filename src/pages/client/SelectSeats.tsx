@@ -1,11 +1,12 @@
 import { Fragment, useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
+import { SeatStatusDTO, showtimeService } from '../../services/showtimeService';
+import { bookingService } from '../../services/bookingService';
+import { useNavigate } from 'react-router-dom';
+
 const ROWS = ['A', 'B', 'C', 'D', 'E', 'F'] as const;
 
-// Quy ước seatId: RowLetter + number (vd: E4)
-const SOLD_SEATS = new Set<string>(['D1', 'D2', 'D3', 'D4', 'F3', 'F4']);
-const INITIAL_SELECTED_SEATS = ['E4', 'E5'];
 
 type BookingState = {
   movie: { id: number; title: string; posterUrl?: string; duration?: number };
@@ -14,24 +15,45 @@ type BookingState = {
   showtimeId: number;
   cinemaName: string;
   startTime?: string;
+  price?: number;
 };
 
 export default function SelectSeats() {
   const location = useLocation();
+  const navigate = useNavigate();
   const booking = (location.state as { booking?: BookingState } | null)?.booking;
 
-  const [selectedSeats, setSelectedSeats] = useState<string[]>(INITIAL_SELECTED_SEATS);
+  const [seats, setSeats] = useState<SeatStatusDTO[]>([]);
+  const [selectedSeats, setSelectedSeats] = useState<{id: number, seatNumber: string}[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' });
-  }, []);
+    if (!booking?.showtimeId) {
+      // Redirect back if no booking context is found
+      navigate(-1);
+      return;
+    }
+    const fetchSeats = async () => {
+      try {
+        setLoading(true);
+        const data = await showtimeService.getSeatsByShowtimeId(booking.showtimeId);
+        setSeats(data);
+      } catch (error) {
+        console.error("Failed to load seats", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSeats();
+  }, [booking, navigate]);
 
-  const sortSeatIds = (ids: string[]) =>
-    [...ids].sort((a, b) => {
-      const rowA = a.slice(0, 1) as (typeof ROWS)[number];
-      const rowB = b.slice(0, 1) as (typeof ROWS)[number];
-      const numA = Number(a.slice(1));
-      const numB = Number(b.slice(1));
+  const sortSeatIds = (selected: {id: number, seatNumber: string}[]) =>
+    [...selected].sort((a, b) => {
+      const rowA = a.seatNumber.slice(0, 1) as (typeof ROWS)[number];
+      const rowB = b.seatNumber.slice(0, 1) as (typeof ROWS)[number];
+      const numA = Number(a.seatNumber.slice(1));
+      const numB = Number(b.seatNumber.slice(1));
       const rowIndexA = ROWS.indexOf(rowA);
       const rowIndexB = ROWS.indexOf(rowB);
       return rowIndexA - rowIndexB || numA - numB;
@@ -39,31 +61,37 @@ export default function SelectSeats() {
 
   const selectedSeatsSorted = sortSeatIds(selectedSeats);
 
-  const toggleSeat = (seatId: string) => {
-    if (SOLD_SEATS.has(seatId)) return; // Ghế đã bán không thể click
+  const toggleSeat = (seatObj: SeatStatusDTO) => {
+    if (seatObj.booked) return; // Ghế đã bán không thể click
 
     setSelectedSeats((prev) => {
-      if (prev.includes(seatId)) return prev.filter((id) => id !== seatId);
-      return [...prev, seatId];
+      if (prev.find(s => s.id === seatObj.id)) return prev.filter((s) => s.id !== seatObj.id);
+      return [...prev, { id: seatObj.id, seatNumber: seatObj.seatNumber }];
     });
   };
 
-  const getSeatStatus = (seatId: string) => {
-    if (SOLD_SEATS.has(seatId)) return 'sold' as const;
-    if (selectedSeats.includes(seatId)) return 'selected' as const;
+  const getSeatStatus = (seatObj: SeatStatusDTO | undefined) => {
+    if (!seatObj) return 'disabled' as const;
+    if (seatObj.booked) return 'sold' as const;
+    if (selectedSeats.find(s => s.id === seatObj.id)) return 'selected' as const;
     return 'available' as const;
   };
 
-  const renderSeatButton = (seatId: string) => {
-    const status = getSeatStatus(seatId);
+  const renderSeatButton = (seatNumberString: string) => {
+    const seatObj = seats.find(s => s.seatNumber === seatNumberString);
+    const status = getSeatStatus(seatObj);
+
+    if (status === 'disabled') {
+       return <div key={seatNumberString} className="w-8 h-8 opacity-20" />; // Empty slot
+    }
 
     if (status === 'sold') {
       return (
         <button
-          key={seatId}
+          key={seatObj!.id}
           type="button"
           disabled
-          aria-label={`${seatId} - Đã bán`}
+          aria-label={`${seatNumberString} - Đã bán`}
           className="w-8 h-8 rounded-t-xl rounded-b-md bg-red-600 border border-red-400/60 opacity-95 cursor-not-allowed relative overflow-hidden"
         >
           <span className="absolute inset-0 flex items-center justify-center">
@@ -77,9 +105,9 @@ export default function SelectSeats() {
 
     return (
       <button
-        key={seatId}
+        key={seatObj!.id}
         type="button"
-        onClick={() => toggleSeat(seatId)}
+        onClick={() => toggleSeat(seatObj!)}
         aria-pressed={isSelected}
         className={
           isSelected
@@ -87,7 +115,7 @@ export default function SelectSeats() {
             : 'w-8 h-8 rounded-t-xl rounded-b-md bg-surface-container-high border border-outline-variant/30 hover:bg-primary/20 transition-colors'
         }
       >
-        {isSelected ? seatId : null}
+        {isSelected ? seatObj!.seatNumber : null}
       </button>
     );
   };
@@ -131,29 +159,35 @@ export default function SelectSeats() {
             </div>
 
             {/* Seat Grid */}
-            <div className="overflow-x-auto pb-8 custom-scrollbar">
-              <div className="min-w-[600px] flex flex-col gap-4 items-center">
-                {ROWS.map((row) => (
-                  <Fragment key={row}>
-                    <div className="flex items-center gap-4">
-                      <span className="w-6 text-center font-headline font-bold text-on-surface-variant">
-                        {row}
-                      </span>
-                      <div className="flex gap-2">
-                        {[1, 2].map((seatNum) => renderSeatButton(`${row}${seatNum}`))}
-                        <div className="w-4" />
-                        {[3, 4, 5, 6].map((seatNum) => renderSeatButton(`${row}${seatNum}`))}
-                        <div className="w-4" />
-                        {[7, 8].map((seatNum) => renderSeatButton(`${row}${seatNum}`))}
+            <div className="overflow-x-auto pb-8 custom-scrollbar relative min-h-[300px]">
+              {loading ? (
+                 <div className="absolute inset-0 flex items-center justify-center bg-surface-container-lowest/80 z-10">
+                   <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                 </div>
+              ) : (
+                <div className="min-w-[600px] flex flex-col gap-4 items-center">
+                  {ROWS.map((row) => (
+                    <Fragment key={row}>
+                      <div className="flex items-center gap-4">
+                        <span className="w-6 text-center font-headline font-bold text-on-surface-variant">
+                          {row}
+                        </span>
+                        <div className="flex gap-2">
+                          {[1, 2].map((seatNum) => renderSeatButton(`${row}${seatNum}`))}
+                          <div className="w-4" />
+                          {[3, 4, 5, 6].map((seatNum) => renderSeatButton(`${row}${seatNum}`))}
+                          <div className="w-4" />
+                          {[7, 8].map((seatNum) => renderSeatButton(`${row}${seatNum}`))}
+                        </div>
+                        <span className="w-6 text-center font-headline font-bold text-on-surface-variant">
+                          {row}
+                        </span>
                       </div>
-                      <span className="w-6 text-center font-headline font-bold text-on-surface-variant">
-                        {row}
-                      </span>
-                    </div>
-                    {row === 'B' ? <div className="h-4" /> : null}
-                  </Fragment>
-                ))}
-              </div>
+                      {row === 'B' ? <div className="h-4" /> : null}
+                    </Fragment>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Legend */}
@@ -207,28 +241,67 @@ export default function SelectSeats() {
             
             <div className="mb-6 pb-6 border-b border-outline-variant/20">
               <div className="flex justify-between items-center mb-4">
-                <span className="text-on-surface-variant">Selected Seats</span>
+                <span className="text-on-surface-variant">Ghế đã chọn</span>
                 <span className="font-headline font-bold text-on-surface">
-                  {selectedSeatsSorted.length ? selectedSeatsSorted.join(', ') : '—'}
+                  {selectedSeatsSorted.length ? selectedSeatsSorted.map(s => s.seatNumber).join(', ') : '—'}
                 </span>
               </div>
               <div className="flex justify-between items-center text-sm">
-                <span className="text-on-surface-variant">2 × Adult (IMAX)</span>
-                <span className="font-medium text-on-surface">$44.00</span>
+                <span className="text-on-surface-variant">{selectedSeatsSorted.length} × Vé Tiêu chuẩn</span>
               </div>
             </div>
             
             <div className="flex justify-between items-end mb-8">
               <div>
-                <span className="text-sm text-on-surface-variant block mb-1">Total Amount</span>
-                <span className="text-3xl font-headline font-extrabold text-primary">$44.00</span>
+                <span className="text-sm text-on-surface-variant block mb-1">Tạm tính (chưa giảm giá)</span>
+                <span className="text-3xl font-headline font-extrabold text-primary">
+                  {booking?.price 
+                    ? `${(booking.price * selectedSeats.length).toLocaleString()} ₫`
+                    : '...'}
+                </span>
               </div>
             </div>
             
-            <Link to="/checkout" className="w-full py-4 bg-primary text-on-primary rounded-xl font-headline font-bold hover:bg-primary/90 transition-all shadow-md flex items-center justify-center gap-2">
-              Proceed to Payment
+            <button 
+              onClick={async () => {
+                if (selectedSeats.length === 0) return;
+                const userRaw = localStorage.getItem('currentUser');
+                if (!userRaw) {
+                  window.dispatchEvent(new Event('open-login-modal'));
+                  return;
+                }
+                
+                try {
+                  const user = JSON.parse(userRaw);
+                  const realUserId = user.id || user.userId;
+                  if (!realUserId) {
+                     alert("Lỗi dữ liệu phiên đăng nhập. Vui lòng đăng xuất và đăng nhập lại.");
+                     return;
+                  }
+                  
+                  const res = await bookingService.holdBooking({
+                    userId: realUserId,
+                    showtimeId: booking!.showtimeId,
+                    seatIds: selectedSeatsSorted.map(s => s.id)
+                  });
+                  
+                  navigate('/checkout', {
+                    state: {
+                      booking,
+                      selectedSeats: selectedSeatsSorted,
+                      bookingId: res.bookingId
+                    }
+                  });
+                } catch (error: any) {
+                  alert(error.response?.data?.message || error.response?.data || 'Đã có lỗi xảy ra. Vui lòng thử lại.');
+                }
+              }}
+              disabled={selectedSeats.length === 0}
+              className="w-full py-4 bg-primary disabled:bg-surface-container-highest disabled:text-on-surface-variant text-on-primary rounded-xl font-headline font-bold hover:bg-primary/90 transition-all shadow-md flex items-center justify-center gap-2"
+            >
+              Tiến hành thanh toán
               <span className="material-symbols-outlined">payment</span>
-            </Link>
+            </button>
           </div>
         </div>
       </div>

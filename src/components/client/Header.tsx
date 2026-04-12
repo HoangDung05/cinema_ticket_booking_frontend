@@ -62,9 +62,17 @@ export default function Header() {
       }
     }
 
+    function handleOpenLogin() {
+      setIsRegisterOpen(false);
+      setLoginError('');
+      setIsLoginOpen(true);
+    }
+
     document.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('open-login-modal', handleOpenLogin);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('open-login-modal', handleOpenLogin);
     };
   }, []);
 
