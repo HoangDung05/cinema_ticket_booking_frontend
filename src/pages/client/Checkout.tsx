@@ -6,7 +6,13 @@ import { CURRENT_USER_STORAGE_KEY, AuthSession } from '../../utils/authSession';
 import VoucherModal from '../../features/checkout/components/VoucherModal';
 import PaymentMethods, { PaymentMethod } from '../../features/checkout/components/PaymentMethods';
 
+const POSTER_FALLBACK =
+  'https://images.unsplash.com/photo-1626814026160-2237a95fc5a0?auto=format&fit=crop&q=80&w=200';
+
 export default function Checkout() {
+  const location = useLocation();
+  const booking = (location.state as { booking?: BookingFlowState } | null)?.booking;
+
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('momo');
   const [promoCode, setPromoCode] = useState('');
   
@@ -108,27 +114,54 @@ export default function Checkout() {
     }
   };
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, []);
+
+  const seats = booking?.selectedSeats ?? [];
+  const seatLabel = useMemo(() => (seats.length ? seats.join(', ') : '—'), [seats]);
+
+  const subtotalVnd = useMemo(() => seats.length * TICKET_PRICE_VND, [seats.length]);
+
+  const bookingFeeVnd = 0;
+
+  const totalVnd = subtotalVnd + bookingFeeVnd;
+
+  if (!booking?.movie || !booking.selectedSeats?.length) {
+    return (
+      <div className="max-w-7xl mx-auto px-6 py-24 text-center">
+        <h1 className="text-2xl font-headline font-bold text-on-surface mb-3">Chưa có thông tin đặt vé</h1>
+        <p className="text-on-surface-variant mb-6">Vui lòng chọn suất chiếu và ít nhất một ghế trước khi thanh toán.</p>
+        <Link to="/" className="text-primary font-headline font-bold hover:underline">
+          Về trang chủ
+        </Link>
+      </div>
+    );
+  }
+
+  const m = booking.movie;
+
   return (
     <div className="max-w-7xl mx-auto px-6 py-12">
-      {/* Stepper */}
+      {/* Stepper — đồng bộ với chọn ghế */}
       <div className="flex items-center justify-center mb-16">
         <div className="flex items-center gap-4">
           <div className="flex flex-col items-center gap-2">
-            <div className="w-10 h-10 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center font-headline font-bold">
-              1
+            <div className="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center font-headline font-bold shadow-md">
+              <span className="material-symbols-outlined text-xl">check</span>
             </div>
-            <span className="text-sm font-headline font-semibold text-on-surface-variant">Lựa chọn</span>
+            <span className="text-sm font-headline font-bold text-primary">Lịch chiếu</span>
           </div>
-          <div className="w-16 h-1 bg-surface-container-high rounded-full overflow-hidden">
-            <div className="w-1/3 h-full bg-primary" />
-          </div>
+          <div className="w-16 h-1 bg-primary rounded-full" />
           <div className="flex flex-col items-center gap-2">
-            <div className="w-10 h-10 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center font-headline font-bold">
-              2
+            <div className="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center font-headline font-bold shadow-md">
+              <span className="material-symbols-outlined text-xl">check</span>
             </div>
-            <span className="text-sm font-headline font-semibold text-on-surface-variant">Chi tiết</span>
+            <span className="text-sm font-headline font-bold text-primary">Chọn ghế</span>
           </div>
-          <div className="w-16 h-1 bg-surface-container-high rounded-full" />
+          <div className="w-16 h-1 bg-primary rounded-full overflow-hidden">
+            <div className="w-full h-full bg-primary" />
+          </div>
           <div className="flex flex-col items-center gap-2">
             <div className="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center font-headline font-bold shadow-md">
               3
@@ -139,10 +172,10 @@ export default function Checkout() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
-        {/* Booking Summary */}
+        {/* Tóm tắt — cùng cấu trúc trang chọn suất + ghế */}
         <div className="lg:col-span-5">
-          <div className="bg-surface-container-lowest rounded-3xl p-8 border border-outline-variant/20 shadow-sm sticky top-24">
-            <h2 className="text-2xl font-headline font-bold text-on-surface mb-6">Tóm tắt đặt vé</h2>
+          <div className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/20 shadow-lg sticky top-24">
+            <h2 className="text-xl font-headline font-bold text-on-surface mb-6">Tóm tắt đặt vé</h2>
 
             <div className="flex gap-5 mb-6">
               <div className="w-20 h-28 rounded-xl overflow-hidden shrink-0 bg-surface-container-high">
@@ -173,6 +206,14 @@ export default function Checkout() {
                 <span className="text-on-surface-variant font-medium">Giá 1 vé</span>
                 <span className="font-headline font-bold text-on-surface">{priceData ? `${priceData.pricePerSeat.toLocaleString()} ₫` : '...'}</span>
               </div>
+              <div className="flex items-start gap-3">
+                <span className="material-symbols-outlined text-primary mt-0.5">event_seat</span>
+                <div>
+                  <p className="text-sm text-on-surface-variant">Ghế</p>
+                  <p className="font-headline font-bold text-on-surface">{seatLabel}</p>
+                </div>
+              </div>
+            </div>
 
               <div className="pt-4 border-t border-outline-variant/20 flex justify-between items-end">
                 <span className="text-sm text-on-surface-variant">Tạm tính ({priceData?.seatCount ?? 0} ghế)</span>
@@ -180,13 +221,10 @@ export default function Checkout() {
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Voucher + Payment */}
         <div className="lg:col-span-7">
-          <div className="bg-surface-container-lowest rounded-3xl p-8 border border-outline-variant/20 shadow-sm">
+          <div className="bg-surface-container-lowest rounded-2xl p-8 border border-outline-variant/20 shadow-sm">
             <div className="space-y-6">
-              {/* Voucher */}
               <div className="rounded-2xl p-5 border border-outline-variant/20 bg-surface-container-low">
                 <h3 className="text-lg font-headline font-bold text-on-surface mb-4">Mã giảm giá / Voucher</h3>
 
@@ -206,7 +244,6 @@ export default function Checkout() {
               {/* Payment methods */}
               <PaymentMethods paymentMethod={paymentMethod} setPaymentMethod={setPaymentMethod} />
 
-              {/* Total & Pay */}
               <div className="pt-4">
                 {errorMsg && (
                    <div className="mb-4 p-3 bg-red-100 border border-red-300 text-red-700 rounded-lg text-sm text-center">
@@ -261,5 +298,5 @@ export default function Checkout() {
         currentSubtotal={booking?.price && selectedSeats?.length ? booking.price * selectedSeats.length : (priceData?.subtotal || 0)}
       />
     </div>
-  );
+  ) ;
 }

@@ -1,5 +1,6 @@
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { BookingFlowState, TICKET_PRICE_VND, formatVnd } from '../../utils/bookingFlow';
 
 import { SeatStatusDTO, showtimeService } from '../../services/showtimeService';
 import { bookingService } from '../../services/bookingService';
@@ -120,6 +121,20 @@ export default function SelectSeats() {
     );
   };
 
+  if (!booking?.movie) {
+    return (
+      <div className="max-w-7xl mx-auto px-6 py-24 text-center">
+        <h1 className="text-2xl font-headline font-bold text-on-surface mb-3">Chưa có thông tin suất chiếu</h1>
+        <p className="text-on-surface-variant mb-6">Vui lòng chọn lịch chiếu trước khi chọn ghế.</p>
+        <Link to="/" className="text-primary font-headline font-bold hover:underline">
+          Về trang chủ
+        </Link>
+      </div>
+    );
+  }
+
+  const m = booking.movie;
+
   return (
     <div className="max-w-7xl mx-auto px-6 py-12">
       {/* Stepper */}
@@ -212,30 +227,22 @@ export default function SelectSeats() {
           </div>
         </div>
 
-        {/* Sidebar Summary */}
+        {/* Sidebar — cùng cấu trúc với trang chọn suất */}
         <div className="lg:col-span-4">
-          <div className="bg-surface-container-lowest rounded-3xl p-6 border border-outline-variant/20 shadow-lg sticky top-24">
-            <h2 className="text-2xl font-headline font-bold text-on-surface mb-6">Tóm tắt đặt vé</h2>
-            
+          <div className="bg-surface-container-lowest rounded-2xl p-6 border border-outline-variant/20 shadow-lg sticky top-24">
             <div className="flex gap-4 mb-6 pb-6 border-b border-outline-variant/20">
-              <div className="w-16 rounded-lg overflow-hidden shrink-0 aspect-[2/3] bg-surface-container-high">
+              <div className="w-20 rounded-lg overflow-hidden shrink-0 aspect-[2/3] bg-surface-container-high">
                 <img
-                  src={
-                    booking?.movie?.posterUrl ||
-                    'https://images.unsplash.com/photo-1626814026160-2237a95fc5a0?auto=format&fit=crop&q=80&w=200'
-                  }
-                  alt={booking?.movie?.title ? `Áp phích ${booking.movie.title}` : 'Poster'}
+                  src={m.posterUrl || POSTER_FALLBACK}
+                  alt={`Áp phích ${m.title}`}
                   className="w-full h-full object-cover"
                 />
               </div>
               <div className="min-w-0">
-                <h3 className="font-headline font-bold text-on-surface mb-1 line-clamp-2">
-                  {booking?.movie.title ?? '—'}
-                </h3>
-                <p className="text-sm text-on-surface-variant">{booking?.cinemaName ?? '—'}</p>
-                <p className="text-sm font-medium text-on-surface mt-1">
-                  {booking ? `${booking.dateDisplay} • ${booking.timeLabel}` : '—'}
-                </p>
+                <h3 className="font-headline font-bold text-on-surface mb-1 line-clamp-2">{m.title}</h3>
+                {m.duration != null ? (
+                  <p className="text-sm text-on-surface-variant">{m.duration} phút</p>
+                ) : null}
               </div>
             </div>
             
