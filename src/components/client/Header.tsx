@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
+import { movieService, MovieDto } from '../../services/movieService';
 import { AuthSession, CURRENT_USER_STORAGE_KEY } from '../../utils/authSession';
 
 type LoginForm = {
@@ -38,6 +39,11 @@ export default function Header() {
   const [isLoginLoading, setIsLoginLoading] = useState(false);
   const [isRegisterLoading, setIsRegisterLoading] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [searchResults, setSearchResults] = useState<MovieDto[]>([]);
+  const [isSearchLoading, setIsSearchLoading] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   useEffect(() => {
     const rawCurrentUser = localStorage.getItem(CURRENT_USER_STORAGE_KEY);
@@ -60,6 +66,9 @@ export default function Header() {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
         setIsUserMenuOpen(false);
       }
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setIsSearchOpen(false);
+      }
     }
 
     function handleOpenLogin() {
@@ -75,6 +84,32 @@ export default function Header() {
       window.removeEventListener('open-login-modal', handleOpenLogin);
     };
   }, []);
+
+  useEffect(() => {
+    const keyword = searchKeyword.trim();
+    if (!keyword) {
+      setSearchResults([]);
+      setIsSearchOpen(false);
+      setIsSearchLoading(false);
+      return;
+    }
+
+    const timer = window.setTimeout(async () => {
+      setIsSearchLoading(true);
+      try {
+        const data = await movieService.searchMovies(keyword);
+        setSearchResults(data);
+        setIsSearchOpen(true);
+      } catch {
+        setSearchResults([]);
+        setIsSearchOpen(true);
+      } finally {
+        setIsSearchLoading(false);
+      }
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [searchKeyword]);
 
   const handleLoginSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -107,13 +142,26 @@ export default function Header() {
     event.preventDefault();
     setIsRegisterLoading(true);
     setRegisterError('');
+    const phone = registerForm.phone.trim();
+    const password = registerForm.password;
+
+    if (!/^\d{10}$/.test(phone)) {
+      setRegisterError('Số điện thoại phải gồm đúng 10 chữ số.');
+      setIsRegisterLoading(false);
+      return;
+    }
+    if (password.length < 6) {
+      setRegisterError('Mật khẩu phải có ít nhất 6 ký tự.');
+      setIsRegisterLoading(false);
+      return;
+    }
 
     try {
       await authService.register({
         fullName: registerForm.fullName.trim(),
         email: registerForm.email.trim(),
-        phone: registerForm.phone.trim(),
-        password: registerForm.password,
+        phone,
+        password,
       });
       setRegisterForm({ fullName: '', email: '', phone: '', password: '' });
       setIsRegisterOpen(false);
@@ -146,9 +194,44 @@ export default function Header() {
           </div>
 
           <div className="flex items-center gap-6">
-            <div className="relative flex-grow md:w-64">
+            <div className="relative flex-grow md:w-64" ref={searchRef}>
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
-              <input type="text" placeholder="Tìm kiếm phim..." className="w-full pl-10 pr-4 py-2 bg-surface-container-low border-none rounded-xl focus:ring-2 focus:ring-primary text-on-surface placeholder:text-outline" />
+              <input
+                type="text"
+                value={searchKeyword}
+                onChange={(event) => setSearchKeyword(event.target.value)}
+                onFocus={() => {
+                  if (searchKeyword.trim()) setIsSearchOpen(true);
+                }}
+                placeholder="Tìm kiếm phim..."
+                className="w-full pl-10 pr-4 py-2 bg-surface-container-low border-none rounded-xl focus:ring-2 focus:ring-primary text-on-surface placeholder:text-outline"
+              />
+              {isSearchOpen ? (
+                <div className="absolute top-full mt-2 w-full max-h-80 overflow-auto rounded-xl border border-outline-variant/30 bg-surface-container-lowest shadow-xl z-50">
+                  {isSearchLoading ? (
+                    <p className="px-4 py-3 text-sm text-on-surface-variant">Đang tìm kiếm...</p>
+                  ) : searchResults.length > 0 ? (
+                    searchResults.map((movie) => (
+                      <Link
+                        key={movie.id}
+                        to={`/movie/${movie.id}`}
+                        onClick={() => {
+                          setIsSearchOpen(false);
+                          setSearchKeyword('');
+                        }}
+                        className="block px-4 py-3 hover:bg-surface-container-low transition-colors border-b border-outline-variant/10 last:border-b-0"
+                      >
+                        <p className="font-headline font-semibold text-on-surface line-clamp-1">{movie.title}</p>
+                        <p className="text-xs text-on-surface-variant">
+                          {movie.duration} phút
+                        </p>
+                      </Link>
+                    ))
+                  ) : (
+                    <p className="px-4 py-3 text-sm text-on-surface-variant">Không tìm thấy phim phù hợp.</p>
+                  )}
+                </div>
+              ) : null}
             </div>
             <button className="text-on-surface-variant hover:text-primary transition-colors">
               <span className="material-symbols-outlined text-2xl">notifications</span>
@@ -204,6 +287,16 @@ export default function Header() {
                       className="w-full text-left px-4 py-3 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
                     >
                       Hồ sơ cá nhân
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        navigate('/change-password');
+                      }}
+                      className="w-full text-left px-4 py-3 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                    >
+                      Đổi mật khẩu
                     </button>
                     <button
                       type="button"

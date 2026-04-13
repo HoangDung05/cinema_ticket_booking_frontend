@@ -3,6 +3,7 @@ import { bookingService, BookingHistoryDTO, PENDING_HOLD_MS } from '../../servic
 import { readAuthSession } from '../../utils/authSession';
 import { parseLocalDateTimeLoose } from '../../utils/localDateTime';
 import { formatShowtimeWindowFromIso } from '../../utils/showtimeRange';
+import { useNavigate } from 'react-router-dom';
 
 const TICKET_POSTER_FALLBACK =
   'https://images.unsplash.com/photo-1626814026160-2237a95fc5a0?auto=format&fit=crop&q=80&w=600';
@@ -75,9 +76,11 @@ function sortHistory(a: BookingHistoryDTO, b: BookingHistoryDTO): number {
 }
 
 export default function MyTickets() {
+  const navigate = useNavigate();
   const [tickets, setTickets] = useState<BookingHistoryDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [continuingId, setContinuingId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
   const [nowTick, setNowTick] = useState(() => Date.now());
   const lastPollRef = useRef(0);
@@ -154,6 +157,53 @@ export default function MyTickets() {
         : tickets.filter((t) => isHistoryTicket(t, now));
     return [...list].sort(activeTab === 'upcoming' ? sortUpcoming : sortHistory);
   }, [tickets, activeTab, now]);
+
+  const handleContinuePayment = async (ticket: BookingHistoryDTO) => {
+    const now = Date.now();
+    if ((ticket.status || '').toUpperCase() !== 'PENDING' || isPendingOverdue(ticket, now)) return;
+    try {
+      setContinuingId(ticket.bookingId);
+      const detail = await bookingService.getBookingDetail(ticket.bookingId);
+      const showtime = detail.showtime;
+      const seatDetails = detail.seatDetails ?? [];
+      if (!showtime?.showtimeId || seatDetails.length === 0) {
+        throw new Error('Không đủ dữ liệu để tiếp tục thanh toán.');
+      }
+
+      const showtimeDate = parseLocalDateTimeLoose(showtime.startTime);
+      const dateDisplay = showtimeDate.toLocaleDateString('vi-VN', {
+        weekday: 'long',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      });
+      const timeLabel = formatShowtimeWindowFromIso(showtime.startTime, showtime.movieDuration);
+
+      navigate('/checkout', {
+        state: {
+          bookingId: ticket.bookingId,
+          booking: {
+            movie: {
+              id: 0,
+              title: showtime.movieTitle,
+              posterUrl: showtime.posterUrl,
+              duration: showtime.movieDuration,
+            },
+            dateDisplay,
+            timeLabel,
+            showtimeId: showtime.showtimeId,
+            cinemaName: showtime.cinemaName ?? ticket.cinemaName,
+            startTime: showtime.startTime,
+          },
+          selectedSeats: seatDetails,
+        },
+      });
+    } catch (error: any) {
+      alert(error?.response?.data || error?.message || 'Không thể mở lại trang thanh toán. Vui lòng thử lại.');
+    } finally {
+      setContinuingId(null);
+    }
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-12 min-h-[70vh]">
@@ -322,9 +372,20 @@ export default function MyTickets() {
                         </span>
                       )}
                     </div>
-                    <button type="button" className="text-primary font-headline font-bold text-sm hover:underline">
-                      Chi tiết
-                    </button>
+                    {(ticket.status || '').toUpperCase() === 'PENDING' && !isPendingOverdue(ticket, now) ? (
+                      <button
+                        type="button"
+                        onClick={() => handleContinuePayment(ticket)}
+                        disabled={continuingId === ticket.bookingId}
+                        className="text-primary font-headline font-bold text-sm hover:underline disabled:opacity-50"
+                      >
+                        {continuingId === ticket.bookingId ? 'Đang mở...' : 'Tiếp tục thanh toán'}
+                      </button>
+                    ) : (
+                      <button type="button" className="text-primary font-headline font-bold text-sm hover:underline">
+                        Chi tiết
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

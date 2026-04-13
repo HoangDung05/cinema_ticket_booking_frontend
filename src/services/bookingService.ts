@@ -67,6 +67,26 @@ export interface PayBookingRequest {
   voucherCode?: string;
 }
 
+export interface BookingDetailResponse {
+  id: number;
+  status: string;
+  createdAt?: string | number[];
+  totalPrice: number;
+  discountAmount?: number;
+  showtime?: {
+    showtimeId: number;
+    startTime: string;
+    movieTitle: string;
+    movieDuration?: number;
+    posterUrl?: string;
+    roomName?: string;
+    cinemaName?: string;
+  };
+  seats?: string[];
+  seatDetails?: { id: number; seatNumber: string }[];
+  voucherCode?: string;
+}
+
 export const bookingService = {
   // Tính giá đặt vé trước khi submit
   calculatePrice: async (request: PriceCalculateRequest): Promise<PriceCalculateResponse> => {
@@ -83,6 +103,11 @@ export const bookingService = {
   // Giai đoạn 2: Thanh toán Hóa đơn PENDING -> PAID
   payBooking: async (bookingId: number, request: PayBookingRequest): Promise<BookingResponse> => {
     const response = await apiClient.post<BookingResponse>(`/bookings/${bookingId}/pay`, request);
+    return response.data;
+  },
+
+  getBookingDetail: async (bookingId: number): Promise<BookingDetailResponse> => {
+    const response = await apiClient.get<BookingDetailResponse>(`/bookings/${bookingId}`);
     return response.data;
   },
 

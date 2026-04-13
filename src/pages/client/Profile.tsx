@@ -13,6 +13,10 @@ type User = {
 export default function Profile() {
   const [isLoading, setIsLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<User | null>(null);
+  const [profileForm, setProfileForm] = useState({ fullName: '', phone: '' });
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileMsg, setProfileMsg] = useState('');
+  const [profileErr, setProfileErr] = useState('');
 
   let authPayload: any = null;
   try {
@@ -29,6 +33,10 @@ export default function Profile() {
       userService.getMyProfile(authPayload.email)
         .then(data => {
           setUserProfile(data);
+          setProfileForm({
+            fullName: data.fullName || '',
+            phone: data.phone || '',
+          });
         })
         .catch(err => {
           console.error('Lỗi khi tải thông tin:', err);
@@ -56,6 +64,43 @@ export default function Profile() {
 
   const displayUser = userProfile || authPayload;
 
+  const handleSaveProfile = async () => {
+    if (!authPayload?.email) return;
+    setProfileErr('');
+    setProfileMsg('');
+    setIsSavingProfile(true);
+    try {
+      const updated = await userService.updateMyProfile(authPayload.email, {
+        fullName: profileForm.fullName.trim(),
+        phone: profileForm.phone.trim(),
+      });
+      setUserProfile(updated);
+      setProfileForm({
+        fullName: updated.fullName || '',
+        phone: updated.phone || '',
+      });
+      const rawCurrentUser = localStorage.getItem(CURRENT_USER_STORAGE_KEY);
+      if (rawCurrentUser) {
+        try {
+          const parsed = JSON.parse(rawCurrentUser);
+          localStorage.setItem(
+            CURRENT_USER_STORAGE_KEY,
+            JSON.stringify({
+              ...parsed,
+              fullName: updated.fullName,
+              phone: updated.phone,
+            })
+          );
+        } catch {}
+      }
+      setProfileMsg('Đã cập nhật thông tin cá nhân.');
+    } catch (err: any) {
+      setProfileErr(err.response?.data || 'Cập nhật thông tin thất bại.');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
   return (
     <div className="max-w-5xl mx-auto px-6 py-12">
       <h1 className="text-3xl font-headline font-bold text-on-surface mb-8">Hồ sơ cá nhân</h1>
@@ -71,18 +116,41 @@ export default function Profile() {
         </div>
 
         <div className="md:col-span-2 space-y-5">
+          <h2 className="text-xl font-headline font-bold text-on-surface">Cập nhật thông tin</h2>
           <div>
             <p className="text-sm text-on-surface-variant mb-1">Họ tên</p>
-            <p className="text-lg font-semibold text-on-surface">{displayUser.fullName}</p>
+            <input
+              value={profileForm.fullName}
+              onChange={(e) => setProfileForm((prev) => ({ ...prev, fullName: e.target.value }))}
+              className="w-full border border-outline-variant/40 rounded-lg px-3 py-2 bg-surface"
+            />
           </div>
           <div>
-            <p className="text-sm text-on-surface-variant mb-1">Email</p>
-            <p className="text-lg font-semibold text-on-surface">{displayUser.email}</p>
+            <p className="text-sm text-on-surface-variant mb-1">Email (không đổi)</p>
+            <input
+              value={displayUser.email || ''}
+              readOnly
+              className="w-full border border-outline-variant/30 rounded-lg px-3 py-2 bg-surface-container-low text-on-surface-variant"
+            />
           </div>
           <div>
             <p className="text-sm text-on-surface-variant mb-1">SĐT</p>
-            <p className="text-lg font-semibold text-on-surface">{displayUser.phone || 'Chưa cập nhật'}</p>
+            <input
+              value={profileForm.phone}
+              onChange={(e) => setProfileForm((prev) => ({ ...prev, phone: e.target.value }))}
+              className="w-full border border-outline-variant/40 rounded-lg px-3 py-2 bg-surface"
+            />
           </div>
+          {profileErr ? <p className="text-sm text-red-600">{profileErr}</p> : null}
+          {profileMsg ? <p className="text-sm text-green-600">{profileMsg}</p> : null}
+          <button
+            type="button"
+            onClick={handleSaveProfile}
+            disabled={isSavingProfile}
+            className="px-5 py-2.5 rounded-lg bg-primary text-white font-headline font-bold hover:opacity-90 disabled:opacity-50"
+          >
+            {isSavingProfile ? 'Đang lưu...' : 'Lưu thay đổi'}
+          </button>
         </div>
       </div>
     </div>

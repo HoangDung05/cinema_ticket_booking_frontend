@@ -12,6 +12,7 @@ import SelectSeats from './pages/client/SelectSeats';
 import Checkout from './pages/client/Checkout';
 import BookingSuccess from './pages/client/BookingSuccess';
 import Profile from './pages/client/Profile';
+import ChangePassword from './pages/client/ChangePassword';
 import MyTickets from './pages/client/MyTickets';
 import About from './pages/client/About';
 
@@ -36,6 +37,7 @@ export default function App() {
           <Route path="checkout" element={<Checkout />} />
           <Route path="booking-success" element={<BookingSuccess />} />
           <Route path="profile" element={<Profile />} />
+          <Route path="change-password" element={<ChangePassword />} />
           <Route path="tickets" element={<MyTickets />} />
           <Route path="about" element={<About />} />
         </Route>

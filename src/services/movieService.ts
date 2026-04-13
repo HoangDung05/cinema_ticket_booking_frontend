@@ -28,6 +28,11 @@ export const movieService = {
     return response.data;
   },
 
+  searchMovies: async (keyword: string): Promise<MovieDto[]> => {
+    const response = await apiClient.get(`/movies/search?keyword=${encodeURIComponent(keyword)}`);
+    return response.data;
+  },
+
   getShowtimesByMovieId: async (movieId: number) => {
     const response = await apiClient.get(`/movies/${movieId}/showtimes`);
     return response.data;
