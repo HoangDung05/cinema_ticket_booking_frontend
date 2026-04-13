@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosHeaders } from 'axios';
 import { CURRENT_USER_STORAGE_KEY } from '../utils/authSession';
 
 const apiClient = axios.create({
@@ -17,7 +17,10 @@ apiClient.interceptors.request.use(
       try {
         const parsed = JSON.parse(rawCurrentUser);
         if (parsed.token) {
-          config.headers.Authorization = `Bearer ${parsed.token}`;
+          // Chuẩn hóa headers để tránh mismatch type giữa object và AxiosHeaders
+          const headers = AxiosHeaders.from(config.headers);
+          headers.set('Authorization', `Bearer ${parsed.token}`);
+          config.headers = headers;
         }
       } catch (e) {
         // Ignore JSON parse error

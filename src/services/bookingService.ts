@@ -49,6 +49,19 @@ export interface BookingHistoryDTO {
   bookingCreatedAt?: string | number[];
 }
 
+// Admin view
+export interface AdminBookingDTO {
+  bookingId: number;
+  userEmail: string;
+  userName: string;
+  movieTitle: string;
+  showtimeStart: string;
+  seatNames: string;
+  totalPrice: number;
+  status: string;
+  createdAt?: string;
+}
+
 export interface PayBookingRequest {
   paymentMethod: string;
   voucherCode?: string;
@@ -77,5 +90,11 @@ export const bookingService = {
   getMyBookings: async (email: string): Promise<BookingHistoryDTO[]> => {
     const response = await apiClient.get<BookingHistoryDTO[]>(`/users/me/bookings?email=${encodeURIComponent(email)}`);
     return response.data;
-  }
+  },
+
+  // Lấy tất cả bookings (admin)
+  getAllBookings: async (): Promise<AdminBookingDTO[]> => {
+    const response = await apiClient.get<AdminBookingDTO[]>('/admin/bookings');
+    return response.data;
+  },
 };

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { bookingService, PriceCalculateResponse } from '../../services/bookingService';
 import { voucherService, VoucherDTO } from '../../services/voucherService';
@@ -58,7 +58,7 @@ export default function Checkout() {
     }
   };
 
-  const handleApplyPromo = (e: React.FormEvent) => {
+  const handleApplyPromo = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     calculateInitialPrice(promoCode);
   };
