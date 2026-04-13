@@ -21,6 +21,7 @@ import Vouchers from './pages/admin/Vouchers';
 import Users from './pages/admin/Users';
 import Rooms from './pages/admin/Rooms';
 import Tickets from './pages/admin/Tickets';
+import Showtimes from './pages/admin/Showtimes';
 
 export default function App() {
   return (
@@ -51,6 +52,7 @@ export default function App() {
           <Route path="vouchers" element={<Vouchers />} /> {/* Đường dẫn: /admin/vouchers */}
           <Route path="users" element={<Users />} />     {/* Đường dẫn: /admin/users */}
           <Route path="rooms" element={<Rooms />} />
+          <Route path="showtimes" element={<Showtimes />} />
           <Route path="tickets" element={<Tickets/>} />
         </Route>
 
