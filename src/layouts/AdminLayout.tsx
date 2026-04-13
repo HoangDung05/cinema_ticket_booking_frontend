@@ -20,6 +20,7 @@ export default function Layout() { // Bỏ { children }
   // Cập nhật lại đường dẫn để có tiền tố /admin
   const navItems = [
     { name: 'Phim', path: '/admin/movies', icon: 'movie' },
+    { name: 'Suất chiếu', path: '/admin/showtimes', icon: 'schedule' },
     { name: 'Mã Giảm Giá', path: '/admin/vouchers', icon: 'confirmation_number' },
     { name: 'Người Dùng', path: '/admin/users', icon: 'group' },
     { name: 'Phòng', path: '/admin/rooms', icon: 'meeting_room'},
@@ -90,7 +91,7 @@ export default function Layout() { // Bỏ { children }
         <header className="flex items-center justify-between px-8 h-16 bg-white/80 dark:bg-gray-950/80 backdrop-blur-md sticky top-0 z-40 transition-colors">
           <div className="flex items-center gap-4">
             <h2 className="font-headline font-extrabold text-lg tracking-tight text-on-surface">
-            Quản Lý {navItems.find(i => i.path === location.pathname)?.name || 'Admin'} 
+            
             </h2>
           </div>
           <div className="flex items-center gap-6">
