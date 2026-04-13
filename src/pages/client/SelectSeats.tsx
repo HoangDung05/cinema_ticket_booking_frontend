@@ -26,6 +26,7 @@ export default function SelectSeats() {
   const [seats, setSeats] = useState<SeatStatusDTO[]>([]);
   const [selectedSeats, setSelectedSeats] = useState<{id: number, seatNumber: string}[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isHoldingSeats, setIsHoldingSeats] = useState(false);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' });
@@ -264,7 +265,7 @@ export default function SelectSeats() {
             
             <button 
               onClick={async () => {
-                if (selectedSeats.length === 0) return;
+                if (selectedSeats.length === 0 || isHoldingSeats) return;
                 const userRaw = localStorage.getItem('currentUser');
                 if (!userRaw) {
                   window.dispatchEvent(new Event('open-login-modal'));
@@ -272,6 +273,7 @@ export default function SelectSeats() {
                 }
                 
                 try {
+                  setIsHoldingSeats(true);
                   const user = JSON.parse(userRaw);
                   const realUserId = user.id || user.userId;
                   if (!realUserId) {
@@ -294,12 +296,14 @@ export default function SelectSeats() {
                   });
                 } catch (error: any) {
                   alert(error.response?.data?.message || error.response?.data || 'Đã có lỗi xảy ra. Vui lòng thử lại.');
+                } finally {
+                  setIsHoldingSeats(false);
                 }
               }}
-              disabled={selectedSeats.length === 0}
+              disabled={selectedSeats.length === 0 || isHoldingSeats}
               className="w-full py-4 bg-primary disabled:bg-surface-container-highest disabled:text-on-surface-variant text-on-primary rounded-xl font-headline font-bold hover:bg-primary/90 transition-all shadow-md flex items-center justify-center gap-2"
             >
-              Tiến hành thanh toán
+              {isHoldingSeats ? 'Đang giữ ghế...' : 'Tiến hành thanh toán'}
               <span className="material-symbols-outlined">payment</span>
             </button>
           </div>

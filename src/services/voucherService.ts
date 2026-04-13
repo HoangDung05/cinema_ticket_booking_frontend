@@ -14,10 +14,21 @@ export type VoucherDto = {
   usedCount?: number | null;
   status?: string | null;
 };
+export type VoucherDTO = VoucherDto;
 
 export type VoucherCreatePayload = Omit<VoucherDto, 'id'>;
 
 export const voucherService = {
+  getActiveVouchers: async (): Promise<VoucherDto[]> => {
+    const res = await apiClient.get('/vouchers');
+    return res.data;
+  },
+
+  getMyVouchers: async (email: string): Promise<unknown[]> => {
+    const res = await apiClient.get(`/users/me/vouchers?email=${encodeURIComponent(email)}`);
+    return res.data;
+  },
+
   getAll: async (): Promise<VoucherDto[]> => {
     const res = await apiClient.get('/vouchers/all');
     return res.data;
