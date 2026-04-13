@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
-import { users } from '../../utils/data';
+import { useEffect, useMemo, useState } from 'react';
+import { authService } from '../../services/authService';
+import { adminChangeUserRole, adminDeleteUser, adminListUsers, adminUpdateUser, type BackendUser } from '../../services/adminUserService';
 
 type UserRow = {
-  id: string;
+  id: number;
   name: string;
   email: string;
   phone: string;
@@ -12,23 +13,25 @@ type UserRow = {
 };
 
 type UserForm = {
-  id: string;
+  id: number | null;
   name: string;
   email: string;
   phone: string;
   role: 'CUSTOMER' | 'ADMIN';
   joined: string;
   avatar: string;
+  password?: string;
 };
 
 const emptyForm: UserForm = {
-  id: '',
+  id: null,
   name: '',
   email: '',
   phone: '',
   role: 'CUSTOMER',
   joined: '',
   avatar: '',
+  password: '',
 };
 
 function formatDateVN(value: string) {
@@ -39,20 +42,53 @@ function formatDateVN(value: string) {
   return date.toLocaleDateString('vi-VN');
 }
 
+function mapBackendToRow(u: BackendUser): UserRow {
+  const roleName = (u.role?.name || 'CUSTOMER').toUpperCase();
+  return {
+    id: u.id,
+    name: u.fullName || '',
+    email: u.email,
+    phone: u.phone || '',
+    role: roleName === 'ADMIN' ? 'ADMIN' : 'CUSTOMER',
+    joined: (u.createdAt || '').slice(0, 10),
+    avatar: '',
+  };
+}
+
 export default function Users() {
-  const [rows, setRows] = useState<UserRow[]>(users as UserRow[]);
+  const [rows, setRows] = useState<UserRow[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isOpen, setIsOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<UserForm>(emptyForm);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const isEdit = useMemo(() => editingId !== null, [editingId]);
+
+  const reload = async () => {
+    const data = await adminListUsers();
+    setRows(data.map(mapBackendToRow));
+  };
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setLoading(true);
+        setError('');
+        await reload();
+      } catch (e: any) {
+        setError(e?.response?.data || e?.message || 'Không tải được danh sách users');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
   const openCreate = () => {
     setEditingId(null);
     setForm({
       ...emptyForm,
-      id: `#LUM-${Math.floor(1000 + Math.random() * 9000)}`,
       joined: new Date().toISOString().slice(0, 10),
     });
     setIsOpen(true);
@@ -60,7 +96,16 @@ export default function Users() {
 
   const openEdit = (row: UserRow) => {
     setEditingId(row.id);
-    setForm({ ...row });
+    setForm({
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      phone: row.phone,
+      role: row.role,
+      joined: row.joined,
+      avatar: row.avatar,
+      password: '',
+    });
     setIsOpen(true);
   };
 
@@ -70,20 +115,69 @@ export default function Users() {
     setForm(emptyForm);
   };
 
-  const saveUser = () => {
+  const saveUser = async () => {
     if (!form.name.trim() || !form.email.trim()) return;
 
-    if (!isEdit) {
-      setRows((prev) => [{ ...form }, ...prev]);
-    } else {
-      setRows((prev) => prev.map((r) => (r.id === editingId ? { ...form } : r)));
+    try {
+      setError('');
+
+      // CREATE: dùng /auth/register => tạo CUSTOMER
+      if (!isEdit) {
+        if (!form.password || form.password.length < 4) {
+          alert('Tạo mới cần mật khẩu (tối thiểu 4 ký tự).');
+          return;
+        }
+
+        await authService.register({
+          fullName: form.name.trim(),
+          email: form.email.trim(),
+          phone: form.phone.trim(),
+          password: form.password,
+        });
+
+        // Nếu muốn tạo ADMIN: sau khi register xong, tìm user theo email rồi đổi role
+        if (form.role === 'ADMIN') {
+          const data = await adminListUsers();
+          const created = data.find((u) => u.email?.toLowerCase?.() === form.email.trim().toLowerCase());
+          if (created?.id) {
+            await adminChangeUserRole(created.id, 'ADMIN');
+          }
+        }
+
+        await reload();
+        closeModal();
+        return;
+      }
+
+      // UPDATE: PUT /admin/users/{id}
+      if (editingId === null) return;
+
+      await adminUpdateUser(editingId, {
+        fullName: form.name.trim(),
+        phone: form.phone.trim(),
+      });
+
+      const current = rows.find((r) => r.id === editingId);
+      if (current && current.role !== form.role) {
+        await adminChangeUserRole(editingId, form.role);
+      }
+
+      await reload();
+      closeModal();
+    } catch (e: any) {
+      setError(e?.response?.data || e?.message || 'Lưu thất bại');
     }
-    closeModal();
   };
 
-  const deleteUser = (id: string) => {
+  const deleteUser = async (id: number) => {
     if (!window.confirm(`Xóa người dùng ${id}?`)) return;
-    setRows((prev) => prev.filter((r) => r.id !== id));
+    try {
+      setError('');
+      await adminDeleteUser(id);
+      setRows((prev) => prev.filter((r) => r.id !== id));
+    } catch (e: any) {
+      setError(e?.response?.data || e?.message || 'Xóa thất bại');
+    }
   };
 
   const filteredRows = useMemo(() => {
@@ -94,7 +188,7 @@ export default function Users() {
         u.name.toLowerCase().includes(q) ||
         u.email.toLowerCase().includes(q) ||
         u.phone.toLowerCase().includes(q) ||
-        u.id.toLowerCase().includes(q) ||
+        String(u.id).toLowerCase().includes(q) ||
         u.role.toLowerCase().includes(q)
     );
   }, [rows, searchTerm]);
@@ -108,6 +202,9 @@ export default function Users() {
           Thêm người dùng
         </button>
       </div>
+
+      {loading ? <div className="text-sm text-gray-500">Đang tải...</div> : null}
+      {error ? <div className="text-sm text-red-600">{error}</div> : null}
       <div className="relative max-w-md">
         <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">search</span>
         <input
@@ -175,8 +272,17 @@ export default function Users() {
             <h3 className="text-lg font-bold">{isEdit ? 'Sửa người dùng' : 'Thêm người dùng'}</h3>
             <div className="space-y-3">
               <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Nhập họ tên" className="w-full border rounded-lg px-3 py-2" />
-              <input value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="Nhập email" className="w-full border rounded-lg px-3 py-2" />
+              <input value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="Nhập email" className="w-full border rounded-lg px-3 py-2" disabled={isEdit} />
               <input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="Nhập số điện thoại" className="w-full border rounded-lg px-3 py-2" />
+              {!isEdit && (
+                <input
+                  value={form.password || ''}
+                  onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                  placeholder="Nhập mật khẩu (khi tạo mới)"
+                  type="password"
+                  className="w-full border rounded-lg px-3 py-2"
+                />
+              )}
               <select value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as UserForm['role'] }))} className="w-full border rounded-lg px-3 py-2">
                 <option value="CUSTOMER">Khách hàng</option>
                 <option value="ADMIN">Quản trị viên</option>

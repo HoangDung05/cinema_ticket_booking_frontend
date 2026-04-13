@@ -1,32 +1,33 @@
-import { useMemo, useState } from 'react';
-import { vouchers } from '../../utils/data';
+import { useEffect, useMemo, useState } from 'react';
+import { voucherService, VoucherDTO } from '../../services/voucherService';
 
 type VoucherRow = {
+  id: number;
   code: string;
-  type: string; // LOẠI
+  discountType: string; // PERCENT hoặc FIXED
   description: string;
+  discountValue: number;
   startDate: string;
-  expiry: string;
-  value: number;
-  maxDiscount: number;
-  usage: number;
-  limit: number | string;
-  status: 'Active' | 'Inactive' | 'Expired';
+  endDate: string;
+  maxDiscountAmount?: number;
+  usedCount?: number;
+  usageLimit?: number;
+  status: string;
 };
 
-type VoucherForm = VoucherRow;
+type VoucherForm = Omit<VoucherRow, 'id'> & { id?: number };
 
 const emptyForm: VoucherForm = {
   code: '',
-  type: '',
+  discountType: 'PERCENT',
   description: '',
+  discountValue: 0,
   startDate: '',
-  expiry: '',
-  value: 0,
-  maxDiscount: 0,
-  usage: 0,
-  limit: '',
-  status: 'Active',
+  endDate: '',
+  maxDiscountAmount: 0,
+  usedCount: 0,
+  usageLimit: 0,
+  status: 'ACTIVE',
 };
 
 function formatDateVN(value: string) {
@@ -37,47 +38,120 @@ function formatDateVN(value: string) {
   return date.toLocaleDateString('vi-VN');
 }
 
+function formatDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export default function Vouchers() {
-  const [rows, setRows] = useState<VoucherRow[]>(vouchers as VoucherRow[]);
+  const [rows, setRows] = useState<VoucherRow[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isOpen, setIsOpen] = useState(false);
-  const [editingCode, setEditingCode] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<VoucherForm>(emptyForm);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const isEdit = useMemo(() => editingCode !== null, [editingCode]);
+  const isEdit = useMemo(() => editingId !== null, [editingId]);
+
+  // Load vouchers on mount
+  useEffect(() => {
+    fetchVouchers();
+  }, []);
+
+  const fetchVouchers = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await voucherService.getAllVouchers();
+      setRows(data as unknown as VoucherRow[]);
+    } catch (err) {
+      console.error('Error fetching vouchers:', err);
+      setError('Lỗi khi tải danh sách mã giảm giá');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const openCreate = () => {
-    setEditingCode(null);
+    setEditingId(null);
     setForm(emptyForm);
     setIsOpen(true);
   };
 
   const openEdit = (row: VoucherRow) => {
-    setEditingCode(row.code);
-    setForm({ ...row });
+    setEditingId(row.id);
+    setForm({
+      ...row,
+      id: row.id,
+    });
     setIsOpen(true);
   };
 
   const closeModal = () => {
     setIsOpen(false);
-    setEditingCode(null);
+    setEditingId(null);
     setForm(emptyForm);
   };
 
-  const saveVoucher = () => {
-    if (!form.code.trim() || !form.type.trim()) return;
-
-    if (!isEdit) {
-      setRows((prev) => [{ ...form }, ...prev]);
-    } else {
-      setRows((prev) => prev.map((r) => (r.code === editingCode ? { ...form } : r)));
+  const saveVoucher = async () => {
+    if (!form.code.trim() || !form.discountType.trim()) {
+      setError('Vui lòng điền đầy đủ thông tin');
+      return;
     }
-    closeModal();
+
+    try {
+      setIsSaving(true);
+      setError(null);
+
+      const voucherData: VoucherDTO = {
+        id: form.id || 0,
+        code: form.code,
+        description: form.description,
+        discountType: form.discountType,
+        discountValue: form.discountValue,
+        maxDiscountAmount: form.maxDiscountAmount || 0,
+        startDate: form.startDate,
+        endDate: form.endDate,
+        usageLimit: form.usageLimit || 0,
+        usedCount: form.usedCount || 0,
+        status: form.status,
+      };
+
+      if (!isEdit) {
+        // Create new voucher
+        await voucherService.createVoucher(voucherData);
+      } else {
+        // Update existing voucher
+        await voucherService.updateVoucher(form.id!, voucherData);
+      }
+
+      // Refresh the list
+      await fetchVouchers();
+      closeModal();
+    } catch (err) {
+      console.error('Error saving voucher:', err);
+      setError('Lỗi khi lưu mã giảm giá');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const deleteVoucher = (code: string) => {
-    if (!window.confirm(`Xóa voucher ${code}?`)) return;
-    setRows((prev) => prev.filter((r) => r.code !== code));
+  const deleteVoucher = async (id: number, code: string) => {
+    if (!window.confirm(`Bạn chắc chắn muốn xóa voucher ${code}?`)) return;
+
+    try {
+      setError(null);
+      await voucherService.deleteVoucher(id);
+      // Refresh the list
+      await fetchVouchers();
+    } catch (err) {
+      console.error('Error deleting voucher:', err);
+      setError('Lỗi khi xóa mã giảm giá');
+    }
   };
 
   const filteredRows = useMemo(() => {
@@ -86,14 +160,29 @@ export default function Vouchers() {
     return rows.filter(
       (row) =>
         row.code.toLowerCase().includes(q) ||
-        row.type.toLowerCase().includes(q) ||
+        row.discountType.toLowerCase().includes(q) ||
         row.description.toLowerCase().includes(q) ||
         row.status.toLowerCase().includes(q)
     );
   }, [rows, searchTerm]);
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <p className="text-gray-500">Đang tải dữ liệu...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+          {error}
+        </div>
+      )}
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-bold font-headline">Quản lý mã giảm giá</h2>
         <button
@@ -133,23 +222,23 @@ export default function Vouchers() {
             </thead>
             <tbody className="text-sm divide-y divide-gray-100">
               {filteredRows.map((row) => (
-                <tr key={row.code} className="hover:bg-gray-50 transition-colors">
+                <tr key={row.id} className="hover:bg-gray-50 transition-colors">
                   <td className="p-4 font-mono font-bold text-gray-900">{row.code}</td>
-                  <td className="p-4 font-semibold text-sky-600">{row.type}</td>
+                  <td className="p-4 font-semibold text-sky-600">{row.discountType}</td>
                   <td className="p-4 text-gray-600">{row.description}</td>
                   <td className="p-4 text-gray-600">{formatDateVN(row.startDate)}</td>
-                  <td className="p-4 text-gray-600">{formatDateVN(row.expiry)}</td>
-                  <td className="p-4 text-gray-900">{row.value.toLocaleString('vi-VN')}</td>
-                  <td className="p-4 text-gray-900">{row.maxDiscount.toLocaleString('vi-VN')}</td>
+                  <td className="p-4 text-gray-600">{formatDateVN(row.endDate)}</td>
+                  <td className="p-4 text-gray-900">{row.discountValue.toLocaleString('vi-VN')}</td>
+                  <td className="p-4 text-gray-900">{(row.maxDiscountAmount || 0).toLocaleString('vi-VN')}</td>
                   <td className="p-4 text-gray-900">
-                    {row.usage} <span className="text-gray-400">/ {row.limit}</span>
+                    {row.usedCount || 0} <span className="text-gray-400">/ {row.usageLimit || 0}</span>
                   </td>
                   <td className="p-4">
                     <span
                       className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                        row.status === 'Active'
+                        row.status === 'ACTIVE'
                           ? 'bg-emerald-100 text-emerald-700'
-                          : row.status === 'Inactive'
+                          : row.status === 'INACTIVE'
                           ? 'bg-gray-100 text-gray-700'
                           : 'bg-red-100 text-red-700'
                       }`}
@@ -162,7 +251,7 @@ export default function Vouchers() {
                       <button onClick={() => openEdit(row)} className="px-3 py-1.5 text-xs rounded-md bg-amber-50 text-amber-700 hover:bg-amber-100">
                         Sửa
                       </button>
-                      <button onClick={() => deleteVoucher(row.code)} className="px-3 py-1.5 text-xs rounded-md bg-red-50 text-red-700 hover:bg-red-100">
+                      <button onClick={() => deleteVoucher(row.id, row.code)} className="px-3 py-1.5 text-xs rounded-md bg-red-50 text-red-700 hover:bg-red-100">
                         Xóa
                       </button>
                     </div>
@@ -183,30 +272,67 @@ export default function Vouchers() {
 
       {isOpen && (
         <div className="fixed inset-0 z-[100] bg-black/30 flex items-center justify-center px-4">
-          <div className="w-full max-w-md bg-white rounded-xl shadow-xl p-5 space-y-4">
+          <div className="w-full max-w-2xl bg-white rounded-xl shadow-xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold">{isEdit ? 'Sửa mã giảm giá' : 'Thêm mã giảm giá'}</h3>
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm">
+                {error}
+              </div>
+            )}
             <div className="space-y-3">
-              <input
-                value={form.code}
-                onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
-                placeholder="Nhập mã giảm giá"
-                className="w-full border rounded-lg px-3 py-2"
-              />
-              <input
-                value={form.type}
-                onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
-                placeholder="Nhập loại (%, VNĐ...)"
-                className="w-full border rounded-lg px-3 py-2"
-              />
-              <textarea
-                value={form.description}
-                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                placeholder="Nhập mô tả mã giảm giá"
-                className="w-full border rounded-lg px-3 py-2 min-h-[80px]"
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <p className="text-xs text-gray-500">Ngày bắt đầu</p>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Mã voucher</label>
+                <input
+                  value={form.code}
+                  onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
+                  placeholder="Nhập mã giảm giá"
+                  disabled={isEdit}
+                  className="w-full border rounded-lg px-3 py-2 disabled:bg-gray-100"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Loại giảm</label>
+                <select
+                  value={form.discountType}
+                  onChange={(e) => setForm((f) => ({ ...f, discountType: e.target.value }))}
+                  className="w-full border rounded-lg px-3 py-2"
+                >
+                  <option value="PERCENT">Phần trăm (%)</option>
+                  <option value="FIXED">Cố định (VNĐ)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Mô tả</label>
+                <textarea
+                  value={form.description}
+                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                  placeholder="Nhập mô tả mã giảm giá"
+                  className="w-full border rounded-lg px-3 py-2 min-h-[80px]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Giá trị giảm</label>
+                <input
+                  type="number"
+                  value={form.discountValue === 0 ? '' : form.discountValue}
+                  onChange={(e) => setForm((f) => ({ ...f, discountValue: Number(e.target.value || 0) }))}
+                  placeholder="Nhập giá trị giảm"
+                  className="w-full border rounded-lg px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Tiền giảm tối đa (VNĐ)</label>
+                <input
+                  type="number"
+                  value={form.maxDiscountAmount === 0 ? '' : form.maxDiscountAmount}
+                  onChange={(e) => setForm((f) => ({ ...f, maxDiscountAmount: Number(e.target.value || 0) }))}
+                  placeholder="Nhập tiền giảm tối đa"
+                  className="w-full border rounded-lg px-3 py-2"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Ngày bắt đầu</label>
                   <input
                     type="date"
                     value={form.startDate}
@@ -214,60 +340,54 @@ export default function Vouchers() {
                     className="w-full border rounded-lg px-3 py-2"
                   />
                 </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-gray-500">Ngày kết thúc</p>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Ngày kết thúc</label>
                   <input
                     type="date"
-                    value={form.expiry}
-                    onChange={(e) => setForm((f) => ({ ...f, expiry: e.target.value }))}
+                    value={form.endDate}
+                    onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))}
                     className="w-full border rounded-lg px-3 py-2"
                   />
                 </div>
               </div>
-              <input
-                type="number"
-                value={form.value === 0 ? '' : form.value}
-                onChange={(e) => setForm((f) => ({ ...f, value: Number(e.target.value || 0) }))}
-                placeholder="Nhập giá trị giảm"
-                className="w-full border rounded-lg px-3 py-2"
-              />
-              <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Giới hạn lượt sử dụng</label>
                 <input
                   type="number"
-                  value={form.maxDiscount === 0 ? '' : form.maxDiscount}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, maxDiscount: Number(e.target.value || 0) }))
-                  }
-                  placeholder="Nhập tiền giảm tối đa"
-                  className="w-full border rounded-lg px-3 py-2"
-                />
-                <input
-                  type="number"
-                  value={form.usage === 0 ? '' : form.usage}
-                  onChange={(e) => setForm((f) => ({ ...f, usage: Number(e.target.value || 0) }))}
-                  placeholder="Nhập lượt đã dùng"
+                  value={form.usageLimit === 0 ? '' : form.usageLimit}
+                  onChange={(e) => setForm((f) => ({ ...f, usageLimit: Number(e.target.value || 0) }))}
+                  placeholder="Nhập giới hạn lượt dùng"
                   className="w-full border rounded-lg px-3 py-2"
                 />
               </div>
-              <input
-                value={String(form.limit)}
-                onChange={(e) => setForm((f) => ({ ...f, limit: e.target.value }))}
-                placeholder="Nhập giới hạn lượt dùng"
-                className="w-full border rounded-lg px-3 py-2"
-              />
-              <select
-                value={form.status}
-                onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as VoucherForm['status'] }))}
-                className="w-full border rounded-lg px-3 py-2"
-              >
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-                <option value="Expired">Expired</option>
-              </select>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">Trạng thái</label>
+                <select
+                  value={form.status}
+                  onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
+                  className="w-full border rounded-lg px-3 py-2"
+                >
+                  <option value="ACTIVE">Hoạt động</option>
+                  <option value="INACTIVE">Không hoạt động</option>
+                  <option value="EXPIRED">Hết hạn</option>
+                </select>
+              </div>
             </div>
             <div className="flex justify-end gap-2">
-              <button onClick={closeModal} className="px-4 py-2 rounded-lg border">Hủy</button>
-              <button onClick={saveVoucher} className="px-4 py-2 rounded-lg bg-sky-600 text-white">Lưu</button>
+              <button
+                onClick={closeModal}
+                disabled={isSaving}
+                className="px-4 py-2 rounded-lg border disabled:opacity-50"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={saveVoucher}
+                disabled={isSaving}
+                className="px-4 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-50"
+              >
+                {isSaving ? 'Đang lưu...' : 'Lưu'}
+              </button>
             </div>
           </div>
         </div>
