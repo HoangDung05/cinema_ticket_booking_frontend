@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { authService } from '../../services/authService';
-import { adminChangeUserRole, adminDeleteUser, adminListUsers, adminUpdateUser, type BackendUser } from '../../services/adminUserService';
+import { adminChangeUserRole, adminDeleteUser, adminListUsers, type BackendUser } from '../../services/adminUserService';
+import { readAuthSession } from '../../utils/authSession';
 
 type UserRow = {
   id: number;
@@ -34,6 +35,14 @@ const emptyForm: UserForm = {
   password: '',
 };
 
+function getErrorMessage(error: any, fallback: string): string {
+  const data = error?.response?.data;
+  if (typeof data === 'string' && data.trim()) return data;
+  if (typeof data?.message === 'string' && data.message.trim()) return data.message;
+  if (typeof error?.message === 'string' && error.message.trim()) return error.message;
+  return fallback;
+}
+
 function formatDateVN(value: string) {
   if (!value) return '';
   const normalized = value.includes('/') ? value.split('/').reverse().join('-') : value;
@@ -56,6 +65,8 @@ function mapBackendToRow(u: BackendUser): UserRow {
 }
 
 export default function Users() {
+  const session = readAuthSession();
+  const currentUserEmail = session?.email?.trim().toLowerCase() || '';
   const [rows, setRows] = useState<UserRow[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isOpen, setIsOpen] = useState(false);
@@ -78,7 +89,7 @@ export default function Users() {
         setError('');
         await reload();
       } catch (e: any) {
-        setError(e?.response?.data || e?.message || 'Không tải được danh sách users');
+        setError(getErrorMessage(e, 'Không tải được danh sách users'));
       } finally {
         setLoading(false);
       }
@@ -149,23 +160,23 @@ export default function Users() {
         return;
       }
 
-      // UPDATE: PUT /admin/users/{id}
+      // UPDATE: Admin chỉ được phép sửa phân quyền
       if (editingId === null) return;
-
-      await adminUpdateUser(editingId, {
-        fullName: form.name.trim(),
-        phone: form.phone.trim(),
-      });
 
       const current = rows.find((r) => r.id === editingId);
       if (current && current.role !== form.role) {
+        const targetEmail = current.email.trim().toLowerCase();
+        if (targetEmail === currentUserEmail && form.role === 'CUSTOMER') {
+          setError('Không thể tự hạ quyền tài khoản admin đang đăng nhập.');
+          return;
+        }
         await adminChangeUserRole(editingId, form.role);
       }
 
       await reload();
       closeModal();
     } catch (e: any) {
-      setError(e?.response?.data || e?.message || 'Lưu thất bại');
+      setError(getErrorMessage(e, 'Lưu thất bại'));
     }
   };
 
@@ -176,7 +187,7 @@ export default function Users() {
       await adminDeleteUser(id);
       setRows((prev) => prev.filter((r) => r.id !== id));
     } catch (e: any) {
-      setError(e?.response?.data || e?.message || 'Xóa thất bại');
+      setError(getErrorMessage(e, 'Xóa thất bại'));
     }
   };
 
@@ -271,9 +282,21 @@ export default function Users() {
           <div className="w-full max-w-md bg-white rounded-xl shadow-xl p-5 space-y-4">
             <h3 className="text-lg font-bold">{isEdit ? 'Sửa người dùng' : 'Thêm người dùng'}</h3>
             <div className="space-y-3">
-              <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Nhập họ tên" className="w-full border rounded-lg px-3 py-2" />
+              <input
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder="Nhập họ tên"
+                className="w-full border rounded-lg px-3 py-2"
+                disabled={isEdit}
+              />
               <input value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="Nhập email" className="w-full border rounded-lg px-3 py-2" disabled={isEdit} />
-              <input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="Nhập số điện thoại" className="w-full border rounded-lg px-3 py-2" />
+              <input
+                value={form.phone}
+                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                placeholder="Nhập số điện thoại"
+                className="w-full border rounded-lg px-3 py-2"
+                disabled={isEdit}
+              />
               {!isEdit && (
                 <input
                   value={form.password || ''}
@@ -287,6 +310,16 @@ export default function Users() {
                 <option value="CUSTOMER">Khách hàng</option>
                 <option value="ADMIN">Quản trị viên</option>
               </select>
+              {isEdit ? (
+                <p className="text-xs text-gray-500">
+                  Chế độ sửa chỉ cho phép thay đổi phân quyền.
+                </p>
+              ) : null}
+              {isEdit && form.email.trim().toLowerCase() === currentUserEmail ? (
+                <p className="text-xs text-amber-700">
+                  Bạn không thể đổi quyền tài khoản admin đang đăng nhập sang Khách hàng.
+                </p>
+              ) : null}
             </div>
             <div className="flex justify-end gap-2">
               <button onClick={closeModal} className="px-4 py-2 rounded-lg border">Hủy</button>
