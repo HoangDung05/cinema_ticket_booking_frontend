@@ -264,6 +264,7 @@ export default function Voucher() {
                                                                  <th className="p-4 font-medium">Ngày hết hạn</th>
                                                                  <th className="p-4 font-medium">Giá trị</th>
                                                                  <th className="p-4 font-medium">Loại</th>
+                                                                 <th className="p-4 font-medium">Giá trị đơn tối thiểu</th>
                                                                  <th className="p-4 font-medium">Giảm tối đa</th>
                                                                  <th className="p-4 font-medium">Lượt dùng</th>
                                                                  <th className="p-4 font-medium">Trạng thái</th>
@@ -282,6 +283,11 @@ export default function Voucher() {
                                                                    <td className="p-4 text-gray-600 whitespace-nowrap">{formatDateVN(row.endDate)}</td>
                                                                    <td className="p-4 text-gray-900 font-medium tabular-nums">{valueCellOnlyNumber(row)}</td>
                                                                    <td className="p-4 font-semibold text-sky-600 whitespace-nowrap">{typeUnit(row.discountType)}</td>
+                                                                   <td className="p-4 text-gray-900 whitespace-nowrap">
+                                                                     {row.minOrderValue != null && Number(row.minOrderValue) > 0
+                                                                       ? Number(row.minOrderValue).toLocaleString('vi-VN') + ' ₫'
+                                                                       : '—'}
+                                                                   </td>
                                                                    <td className="p-4 text-gray-900 whitespace-nowrap">
                                                                      {row.maxDiscountAmount != null && Number(row.maxDiscountAmount) > 0
                                                                        ? Number(row.maxDiscountAmount).toLocaleString('vi-VN') + ' ₫'
@@ -320,7 +326,7 @@ export default function Voucher() {
                                                                ))}
                                                                {!filteredRows.length && (
                                                                  <tr>
-                                                                  <td colSpan={11} className="p-6 text-center text-gray-500">
+                                                                 <td colSpan={12} className="p-6 text-center text-gray-500">
                                                                      Chưa có voucher.
                                                                    </td>
                                                                  </tr>
