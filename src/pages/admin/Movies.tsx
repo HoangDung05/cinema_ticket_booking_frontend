@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { movieService, type MovieDto } from '../../services/movieService';
 
-type MovieStatus = 'Showing' | 'Upcoming' | 'Archived';
-type FilterStatus = 'ALL' | 'SHOWING' | 'UPCOMING';
+type MovieStatus = 'Showing' | 'Upcoming' | 'Ended';
+type FilterStatus = 'ALL' | 'SHOWING' | 'UPCOMING' | 'ENDED';
 
 type MovieRow = {
   id: number;
@@ -30,12 +30,12 @@ const emptyForm: MovieForm = {
 const apiStatus: Record<MovieStatus, MovieDto['status']> = {
   Showing: 'NOW_SHOWING',
   Upcoming: 'COMING_SOON',
-  Archived: 'ENDED',
+  Ended: 'ENDED',
 };
 
 const uiStatus = (s: string): MovieStatus => {
   if (s === 'NOW_SHOWING') return 'Showing';
-  if (s === 'ENDED') return 'Archived';
+  if (s === 'ENDED') return 'Ended';
   return 'Upcoming';
 };
 
@@ -109,7 +109,9 @@ export default function Movies() {
         ? rows
         : filter === 'SHOWING'
           ? rows.filter((m) => m.status === 'Showing')
-          : rows.filter((m) => m.status === 'Upcoming');
+          : filter === 'UPCOMING'
+            ? rows.filter((m) => m.status === 'Upcoming')
+            : rows.filter((m) => m.status === 'Ended');
 
     if (!q) return byFilter;
     return byFilter.filter(
@@ -211,6 +213,16 @@ export default function Movies() {
           >
             Sắp chiếu
           </button>
+          <button
+            onClick={() => setFilter('ENDED')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              filter === 'ENDED'
+                ? 'bg-gray-900 text-white'
+                : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            Kết thúc
+          </button>
         </div>
 
         <button
@@ -264,7 +276,7 @@ export default function Movies() {
                       ? 'Đang chiếu'
                       : movie.status === 'Upcoming'
                         ? 'Sắp chiếu'
-                        : 'Lưu trữ'}
+                        : 'Kết thúc'}
                   </span>
                 </div>
               </div>
@@ -353,7 +365,7 @@ export default function Movies() {
               >
                 <option value="Showing">Đang chiếu</option>
                 <option value="Upcoming">Sắp chiếu</option>
-                <option value="Archived">Lưu trữ</option>
+                <option value="Ended">Kết thúc</option>
               </select>
               <input
                 value={form.image}
