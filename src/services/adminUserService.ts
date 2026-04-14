@@ -35,3 +35,8 @@ export async function adminChangeUserRole(id: number, role: 'ADMIN' | 'CUSTOMER'
   return res.data;
 }
 
+export async function adminChangeUserStatus(id: number, status: 'ACTIVE' | 'LOCKED') {
+  const res = await apiClient.put<string>(`/admin/user/${id}/status`, {}, { params: { status } });
+  return res.data;
+}
+

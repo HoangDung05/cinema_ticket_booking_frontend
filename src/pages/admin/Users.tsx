@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { authService } from '../../services/authService';
-import { adminChangeUserRole, adminDeleteUser, adminListUsers, type BackendUser } from '../../services/adminUserService';
+import { adminChangeUserRole, adminChangeUserStatus, adminListUsers, type BackendUser } from '../../services/adminUserService';
 import { readAuthSession } from '../../utils/authSession';
 
 type UserRow = {
@@ -8,6 +8,7 @@ type UserRow = {
   name: string;
   email: string;
   phone: string;
+  status: 'ACTIVE' | 'LOCKED';
   role: 'CUSTOMER' | 'ADMIN';
   joined: string;
   avatar: string;
@@ -53,11 +54,13 @@ function formatDateVN(value: string) {
 
 function mapBackendToRow(u: BackendUser): UserRow {
   const roleName = (u.role?.name || 'CUSTOMER').toUpperCase();
+  const statusName = (u.status || 'ACTIVE').toUpperCase();
   return {
     id: u.id,
     name: u.fullName || '',
     email: u.email,
     phone: u.phone || '',
+    status: statusName === 'LOCKED' ? 'LOCKED' : 'ACTIVE',
     role: roleName === 'ADMIN' ? 'ADMIN' : 'CUSTOMER',
     joined: (u.createdAt || '').slice(0, 10),
     avatar: '',
@@ -180,14 +183,16 @@ export default function Users() {
     }
   };
 
-  const deleteUser = async (id: number) => {
-    if (!window.confirm(`Xóa người dùng ${id}?`)) return;
+  const toggleUserStatus = async (user: UserRow) => {
+    const nextStatus: 'ACTIVE' | 'LOCKED' = user.status === 'LOCKED' ? 'ACTIVE' : 'LOCKED';
+    const actionLabel = nextStatus === 'LOCKED' ? 'khóa' : 'mở khóa';
+    if (!window.confirm(`Bạn có chắc muốn ${actionLabel} tài khoản ${user.email}?`)) return;
     try {
       setError('');
-      await adminDeleteUser(id);
-      setRows((prev) => prev.filter((r) => r.id !== id));
+      await adminChangeUserStatus(user.id, nextStatus);
+      await reload();
     } catch (e: any) {
-      setError(getErrorMessage(e, 'Xóa thất bại'));
+      setError(getErrorMessage(e, 'Cập nhật trạng thái tài khoản thất bại'));
     }
   };
 
@@ -234,6 +239,7 @@ export default function Users() {
                 <th className="p-4 font-medium">Người dùng</th>
                 <th className="p-4 font-medium">Liên hệ</th>
                 <th className="p-4 font-medium">Phân quyền</th>
+                <th className="p-4 font-medium">Trạng thái</th>
                 <th className="p-4 font-medium">Ngày tham gia</th>
                 <th className="p-4 font-medium text-right">Thao tác</th>
               </tr>
@@ -252,14 +258,24 @@ export default function Users() {
                   <td className="p-4">
                     {u.role === 'ADMIN' ? 'Quản trị viên' : 'Khách hàng'}
                   </td>
+                  <td className="p-4">
+                    {u.status === 'LOCKED' ? 'Đã khóa' : 'Hoạt động'}
+                  </td>
                   <td className="p-4 text-gray-600">{formatDateVN(u.joined)}</td>
                   <td className="p-4">
                     <div className="flex justify-end gap-2">
                       <button onClick={() => openEdit(u)} className="px-3 py-1.5 text-xs rounded-md bg-amber-50 text-amber-700 hover:bg-amber-100">
                         Sửa
                       </button>
-                      <button onClick={() => deleteUser(u.id)} className="px-3 py-1.5 text-xs rounded-md bg-red-50 text-red-700 hover:bg-red-100">
-                        Xóa
+                      <button
+                        onClick={() => toggleUserStatus(u)}
+                        className={`px-3 py-1.5 text-xs rounded-md ${
+                          u.status === 'LOCKED'
+                            ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                            : 'bg-red-50 text-red-700 hover:bg-red-100'
+                        }`}
+                      >
+                        {u.status === 'LOCKED' ? 'Mở khóa' : 'Khóa'}
                       </button>
                     </div>
                   </td>
@@ -267,7 +283,7 @@ export default function Users() {
               ))}
               {!filteredRows.length && (
                 <tr>
-                  <td colSpan={6} className="p-6 text-center text-gray-500">
+                  <td colSpan={7} className="p-6 text-center text-gray-500">
                     Chưa có người dùng.
                   </td>
                 </tr>
