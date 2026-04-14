@@ -188,7 +188,6 @@ export default function Users() {
         u.name.toLowerCase().includes(q) ||
         u.email.toLowerCase().includes(q) ||
         u.phone.toLowerCase().includes(q) ||
-        String(u.id).toLowerCase().includes(q) ||
         u.role.toLowerCase().includes(q)
     );
   }, [rows, searchTerm]);
@@ -220,6 +219,7 @@ export default function Users() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+                <th className="p-4 font-medium">STT</th>
                 <th className="p-4 font-medium">Người dùng</th>
                 <th className="p-4 font-medium">Liên hệ</th>
                 <th className="p-4 font-medium">Phân quyền</th>
@@ -228,11 +228,11 @@ export default function Users() {
               </tr>
             </thead>
             <tbody className="text-sm divide-y divide-gray-100">
-              {filteredRows.map((u) => (
+              {filteredRows.map((u, idx) => (
                 <tr key={u.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="p-4 text-gray-700">{idx + 1}</td>
                   <td className="p-4">
                     <p className="font-semibold text-gray-900">{u.name}</p>
-                    <p className="text-xs text-gray-500">{u.id}</p>
                   </td>
                   <td className="p-4">
                     <p className="text-gray-900">{u.email}</p>
@@ -256,7 +256,7 @@ export default function Users() {
               ))}
               {!filteredRows.length && (
                 <tr>
-                  <td colSpan={5} className="p-6 text-center text-gray-500">
+                  <td colSpan={6} className="p-6 text-center text-gray-500">
                     Chưa có người dùng.
                   </td>
                 </tr>

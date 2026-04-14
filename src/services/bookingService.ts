@@ -43,6 +43,7 @@ export interface BookingHistoryDTO {
   cinemaName: string;
   showtimeStart: string;
   totalPrice: number;
+  discountAmount?: number;
   status: string;
   seatNames: string;
   /** Thời điểm tạo đơn (ISO string hoặc mảng Jackson [y,m,d,h,mi,s]) — đếm ngược khi PENDING */

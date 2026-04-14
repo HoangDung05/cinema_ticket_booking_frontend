@@ -13,6 +13,8 @@ type ShowtimeRow = {
   startTime: string;
   endTime: string;
   price: number;
+  soldSeats: number;
+  totalSeats: number;
 };
 
 type ShowtimeForm = ShowtimeWritePayload;
@@ -66,7 +68,17 @@ function fromApi(item: ShowtimeDto): ShowtimeRow {
     startTime: item.startTime,
     endTime,
     price: Number(item.price ?? 0),
+    soldSeats: 0,
+    totalSeats: 0,
   };
+}
+
+function sortByRoomThenTime(items: ShowtimeRow[]): ShowtimeRow[] {
+  return [...items].sort((a, b) => {
+    const byRoom = a.roomName.localeCompare(b.roomName, 'vi', { sensitivity: 'base' });
+    if (byRoom !== 0) return byRoom;
+    return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
+  });
 }
 
 export default function Showtimes() {
@@ -90,9 +102,34 @@ export default function Showtimes() {
         movieService.getAllMovies(),
         roomService.getAllRooms(),
       ]);
-      setRows(showtimeList.map(fromApi).sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()));
+      const mapped = sortByRoomThenTime(showtimeList.map(fromApi));
+      const seatStats = await Promise.all(
+        mapped.map(async (row) => {
+          try {
+            const seats = await showtimeService.getSeatsByShowtimeId(row.id);
+            const totalSeats = seats.length;
+            const soldSeats = seats.filter((s) => s.booked).length;
+            return { id: row.id, totalSeats, soldSeats };
+          } catch {
+            return { id: row.id, totalSeats: 0, soldSeats: 0 };
+          }
+        })
+      );
+      const statsMap = new Map(seatStats.map((s) => [s.id, s]));
+      setRows(
+        mapped.map((row) => {
+          const stat = statsMap.get(row.id);
+          return {
+            ...row,
+            soldSeats: stat?.soldSeats ?? 0,
+            totalSeats: stat?.totalSeats ?? 0,
+          };
+        })
+      );
       setMovies(movieList);
-      setRooms(roomList);
+      setRooms(
+        [...roomList].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi', { sensitivity: 'base' }))
+      );
     } catch (e) {
       console.error(e);
       setLoadError('Không tải được dữ liệu suất chiếu. Kiểm tra backend và đăng nhập admin.');
@@ -107,13 +144,13 @@ export default function Showtimes() {
 
   const filteredRows = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter(
+    if (!q) return sortByRoomThenTime(rows);
+    const filtered = rows.filter(
       (row) =>
         row.movieTitle.toLowerCase().includes(q) ||
-        row.roomName.toLowerCase().includes(q) ||
-        String(row.id).includes(q)
+        row.roomName.toLowerCase().includes(q)
     );
+    return sortByRoomThenTime(filtered);
   }, [rows, searchTerm]);
 
   const selectedMovie = useMemo(
@@ -163,7 +200,17 @@ export default function Showtimes() {
       if (editingId === null) {
         await showtimeService.createShowtime(form);
       } else {
-        await showtimeService.updateShowtime(editingId, form);
+        const current = rows.find((r) => r.id === editingId);
+        if (!current) {
+          window.alert('Không tìm thấy suất chiếu để cập nhật.');
+          return;
+        }
+        await showtimeService.updateShowtime(editingId, {
+          movieId: current.movieId,
+          startTime: toInputDateTime(current.startTime),
+          price: current.price,
+          roomId: form.roomId,
+        });
       }
       await loadData();
       closeModal();
@@ -207,7 +254,7 @@ export default function Showtimes() {
         <input
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Tìm suất chiếu theo mã, phim, phòng"
+          placeholder="Tìm suất chiếu theo phim, phòng"
           className="w-full border border-gray-200 rounded-lg py-2 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-sky-200"
         />
       </div>
@@ -222,18 +269,19 @@ export default function Showtimes() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
-                  <th className="p-4 font-medium">ID</th>
+                  <th className="p-4 font-medium">STT</th>
                   <th className="p-4 font-medium">Phim</th>
                   <th className="p-4 font-medium">Phòng</th>
                   <th className="p-4 font-medium">Khoảng chiếu</th>
+                  <th className="p-4 font-medium">Đã bán/Tổng ghế</th>
                   <th className="p-4 font-medium">Giá vé</th>
                   <th className="p-4 font-medium text-right">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="text-sm divide-y divide-gray-100">
-                {filteredRows.map((row) => (
+                {filteredRows.map((row, idx) => (
                   <tr key={row.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="p-4 font-mono text-gray-700">{row.id}</td>
+                    <td className="p-4 text-gray-700">{idx + 1}</td>
                     <td className="p-4">
                       <p className="font-semibold text-gray-900">{row.movieTitle}</p>
                       <p className="text-xs text-gray-500">{row.movieDuration || '—'} phút</p>
@@ -242,6 +290,9 @@ export default function Showtimes() {
                     <td className="p-4 text-gray-900">
                       <p>{formatDateTime(row.startTime)}</p>
                       <p className="text-xs text-gray-500">đến {formatDateTime(row.endTime)}</p>
+                    </td>
+                    <td className="p-4 text-gray-900">
+                      {row.soldSeats}/{row.totalSeats}
                     </td>
                     <td className="p-4 text-gray-900">{row.price.toLocaleString('vi-VN')} đ</td>
                     <td className="p-4">
@@ -266,7 +317,7 @@ export default function Showtimes() {
                 ))}
                 {!filteredRows.length && (
                   <tr>
-                    <td className="p-6 text-center text-gray-500" colSpan={6}>
+                    <td className="p-6 text-center text-gray-500" colSpan={7}>
                       Chưa có suất chiếu.
                     </td>
                   </tr>
@@ -280,13 +331,14 @@ export default function Showtimes() {
       {isOpen && (
         <div className="fixed inset-0 z-[100] bg-black/30 flex items-center justify-center px-4">
           <div className="w-full max-w-lg bg-white rounded-xl shadow-xl p-5 space-y-4">
-            <h3 className="text-lg font-bold">{editingId === null ? 'Thêm suất chiếu' : 'Sửa suất chiếu'}</h3>
+            <h3 className="text-lg font-bold">{editingId === null ? 'Thêm suất chiếu' : 'Sửa suất chiếu (chỉ đổi phòng)'}</h3>
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2 space-y-1">
                 <p className="text-xs text-gray-500">Phim</p>
                 <select
                   value={form.movieId || ''}
                   onChange={(e) => setForm((f) => ({ ...f, movieId: Number(e.target.value) }))}
+                  disabled={editingId !== null}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2"
                 >
                   <option value="">Chọn phim</option>
@@ -322,6 +374,7 @@ export default function Showtimes() {
                   step={1000}
                   value={form.price || ''}
                   onChange={(e) => setForm((f) => ({ ...f, price: Number(e.target.value || 0) }))}
+                  disabled={editingId !== null}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2"
                 />
               </div>
@@ -332,6 +385,7 @@ export default function Showtimes() {
                   type="datetime-local"
                   value={form.startTime}
                   onChange={(e) => setForm((f) => ({ ...f, startTime: e.target.value }))}
+                  disabled={editingId !== null}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2"
                 />
               </div>

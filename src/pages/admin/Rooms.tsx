@@ -64,8 +64,7 @@ export default function Rooms() {
     return rows.filter(
       (r) =>
         r.name.toLowerCase().includes(q) ||
-        r.cinema_name.toLowerCase().includes(q) ||
-        String(r.id).includes(q)
+        r.cinema_name.toLowerCase().includes(q)
     );
   }, [rows, searchTerm]);
 
@@ -151,7 +150,7 @@ export default function Rooms() {
         <input
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Tìm phòng theo ID, tên phòng, tên rạp"
+          placeholder="Tìm phòng theo tên phòng, tên rạp"
           className="w-full border border-gray-200 rounded-lg py-2 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-sky-200"
         />
       </div>
@@ -166,16 +165,16 @@ export default function Rooms() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
-                  <th className="p-4 font-medium">ID</th>
+                  <th className="p-4 font-medium">STT</th>
                   <th className="p-4 font-medium">Tên phòng</th>
                   <th className="p-4 font-medium">Rạp</th>
                   <th className="p-4 font-medium text-right">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="text-sm divide-y divide-gray-100">
-                {filteredRows.map((row) => (
+                {filteredRows.map((row, idx) => (
                   <tr key={row.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="p-4 font-mono text-gray-700">{row.id}</td>
+                    <td className="p-4 text-gray-700">{idx + 1}</td>
                     <td className="p-4 font-semibold text-gray-900">{row.name}</td>
                     <td className="p-4 text-gray-900">{row.cinema_name}</td>
                     <td className="p-4">

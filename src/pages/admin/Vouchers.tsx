@@ -257,6 +257,7 @@ export default function Voucher() {
                                            <table className="w-full text-left border-collapse min-w-[960px]">
                                              <thead>
                                                <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+                                                                 <th className="p-4 font-medium">STT</th>
                                                                  <th className="p-4 font-medium">Mã</th>
                                                                  <th className="p-4 font-medium">Mô tả</th>
                                                                  <th className="p-4 font-medium">Ngày bắt đầu</th>
@@ -270,8 +271,9 @@ export default function Voucher() {
                                                                </tr>
                                                              </thead>
                                                              <tbody className="text-sm divide-y divide-gray-100">
-                                                               {filteredRows.map((row) => (
+                                                               {filteredRows.map((row, idx) => (
                                                                  <tr key={row.id} className="hover:bg-gray-50 transition-colors">
+                                                                   <td className="p-4 text-gray-700">{idx + 1}</td>
                                                                    <td className="p-4 font-mono font-bold text-gray-900">{row.code}</td>
                                                                    <td className="p-4 text-gray-600 max-w-[200px] truncate" title={row.description || ''}>
                                                                      {row.description || '—'}
@@ -318,7 +320,7 @@ export default function Voucher() {
                                                                ))}
                                                                {!filteredRows.length && (
                                                                  <tr>
-                                                                   <td colSpan={10} className="p-6 text-center text-gray-500">
+                                                                  <td colSpan={11} className="p-6 text-center text-gray-500">
                                                                      Chưa có voucher.
                                                                    </td>
                                                                  </tr>

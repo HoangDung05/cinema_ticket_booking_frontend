@@ -67,12 +67,14 @@ function isUpcomingTicket(ticket: BookingHistoryDTO, now: number): boolean {
   return !isHistoryTicket(ticket, now);
 }
 
-function sortUpcoming(a: BookingHistoryDTO, b: BookingHistoryDTO): number {
-  return showtimeMs(a.showtimeStart) - showtimeMs(b.showtimeStart);
+function bookingCreatedMs(ticket: BookingHistoryDTO): number {
+  const created = parseBackendLocalDateTime(ticket.bookingCreatedAt as unknown);
+  if (created != null) return created;
+  return showtimeMs(ticket.showtimeStart);
 }
 
-function sortHistory(a: BookingHistoryDTO, b: BookingHistoryDTO): number {
-  return showtimeMs(b.showtimeStart) - showtimeMs(a.showtimeStart);
+function sortByNewestBooked(a: BookingHistoryDTO, b: BookingHistoryDTO): number {
+  return bookingCreatedMs(b) - bookingCreatedMs(a);
 }
 
 export default function MyTickets() {
@@ -90,7 +92,7 @@ export default function MyTickets() {
   const loadTickets = useCallback(
     (email: string) =>
       bookingService.getMyBookings(email).then((data) => {
-        const sorted = [...data].sort((a, b) => showtimeMs(b.showtimeStart) - showtimeMs(a.showtimeStart));
+        const sorted = [...data].sort(sortByNewestBooked);
         setTickets(sorted);
       }),
     []
@@ -155,7 +157,7 @@ export default function MyTickets() {
       activeTab === 'upcoming'
         ? tickets.filter((t) => isUpcomingTicket(t, now))
         : tickets.filter((t) => isHistoryTicket(t, now));
-    return [...list].sort(activeTab === 'upcoming' ? sortUpcoming : sortHistory);
+    return [...list].sort(sortByNewestBooked);
   }, [tickets, activeTab, now]);
 
   const handleContinuePayment = async (ticket: BookingHistoryDTO) => {
@@ -276,6 +278,9 @@ export default function MyTickets() {
             const timeRangeStr = formatShowtimeWindowFromIso(ticket.showtimeStart, ticket.movieDuration);
             const remain = pendingRemainingMs(ticket, now);
             const showCountdown = remain != null && remain > 0;
+            const discount = Number(ticket.discountAmount || 0);
+            const finalPrice = Math.max(0, Number(ticket.totalPrice || 0));
+            const originalPrice = finalPrice + discount;
 
             return (
               <div
@@ -359,18 +364,13 @@ export default function MyTickets() {
                   </div>
 
                   <div className="flex justify-between items-center pt-4 border-t border-outline-variant/20">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
-                      <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-outline-variant">qr_code_2</span>
-                        <span className="text-xs text-on-surface-variant font-mono">
-                          TKT-{ticket.bookingId.toString().padStart(6, '0')}
-                        </span>
-                      </div>
-                      {ticket.totalPrice != null && (
-                        <span className="text-sm font-headline font-bold text-on-surface">
-                          {Number(ticket.totalPrice).toLocaleString('vi-VN')} đ
-                        </span>
-                      )}
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs text-on-surface-variant">
+                        Giá gốc: {originalPrice.toLocaleString('vi-VN')} đ
+                      </span>
+                      <span className="text-sm font-headline font-bold text-on-surface">
+                        Giá sau giảm: {finalPrice.toLocaleString('vi-VN')} đ
+                      </span>
                     </div>
                     {(ticket.status || '').toUpperCase() === 'PENDING' && !isPendingOverdue(ticket, now) ? (
                       <button

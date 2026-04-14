@@ -45,10 +45,12 @@ export default function Checkout() {
     setPriceLoading(true);
     setErrorMsg('');
     try {
+      const normalizedVoucherCode =
+        (overridePromoCode !== undefined ? overridePromoCode : promoCode).trim() || undefined;
       const resp = await bookingService.calculatePrice({
         showtimeId: booking.showtimeId,
         seatIds: selectedSeats.map(s => s.id),
-        voucherCode: overridePromoCode !== undefined ? overridePromoCode : undefined
+        voucherCode: normalizedVoucherCode
       });
       setPriceData(resp);
     } catch (error: any) {
@@ -93,8 +95,9 @@ export default function Checkout() {
     setIsSubmitting(true);
     setErrorMsg('');
     try {
+      const voucherCodeToPay = (priceData?.appliedVoucherCode || promoCode || '').trim() || undefined;
       const resp = await bookingService.payBooking(bookingId, {
-        voucherCode: priceData?.appliedVoucherCode,
+        voucherCode: voucherCodeToPay,
         paymentMethod: paymentMethod.toUpperCase(),
       });
       navigate('/booking-success', { 

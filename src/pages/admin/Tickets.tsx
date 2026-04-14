@@ -82,7 +82,6 @@ export default function Tickets() {
     if (!q) return rows;
     return rows.filter(
       (r) =>
-        String(r.booking_id).includes(q) ||
         r.user_name.toLowerCase().includes(q) ||
         r.user_email.toLowerCase().includes(q) ||
         r.movie_title.toLowerCase().includes(q) ||
@@ -101,7 +100,7 @@ export default function Tickets() {
         <input
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Tìm vé theo booking, người dùng, phim, ghế"
+          placeholder="Tìm vé theo người dùng, phim, ghế"
           className="w-full border border-gray-200 rounded-lg py-2 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-sky-200"
         />
       </div>
@@ -120,7 +119,7 @@ export default function Tickets() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
-                  <th className="p-4 font-medium">Booking ID</th>
+                  <th className="p-4 font-medium">STT</th>
                   <th className="p-4 font-medium">Người dùng</th>
                   <th className="p-4 font-medium">Email</th>
                   <th className="p-4 font-medium">Phim</th>
@@ -131,11 +130,11 @@ export default function Tickets() {
                 </tr>
               </thead>
               <tbody className="text-sm divide-y divide-gray-100">
-                {filteredRows.map((row) => {
+                {filteredRows.map((row, idx) => {
                   const status = mapBookingStatus(row.status);
                   return (
                     <tr key={row.booking_id} className="hover:bg-gray-50 transition-colors">
-                      <td className="p-4 font-mono text-gray-700">{row.booking_id}</td>
+                      <td className="p-4 text-gray-700">{idx + 1}</td>
                       <td className="p-4 text-gray-900">{row.user_name}</td>
                       <td className="p-4 text-gray-600 text-sm">{row.user_email}</td>
                       <td className="p-4 text-gray-900">{row.movie_title}</td>
